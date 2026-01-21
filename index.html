@@ -3,7 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    
+    <!-- Основные мета-теги -->
     <title>Магазин товаров</title>
+    <meta name="description" content="Современный магазин товаров в Telegram. Широкий ассортимент электроники, одежды и книг.">
+    <meta name="keywords" content="магазин, товары, telegram, покупки, электроника, одежда, книги">
+    <meta name="author" content="Anikin Shop">
+    
+    <!-- Open Graph теги (для предпросмотра ссылок) -->
+    <meta property="og:title" content="Магазин товаров">
+    <meta property="og:description" content="Современный магазин товаров в Telegram. Широкий ассортимент электроники, одежды и книг.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="Лого Аникин/1.png">
+    <meta property="og:url" content="">
+    
+    <!-- Telegram Mini App теги -->
+    <meta name="telegram-web-app-theme-color" content="#1F1B20">
+    <meta name="telegram-web-app-background-color" content="#FEFEFE">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="Лого Аникин/1.png">
+    <link rel="apple-touch-icon" href="Лого Аникин/1.png">
+    
+    <!-- Дополнительные теги (добавьте свои здесь) -->
+    <!-- <meta name="robots" content="noindex, nofollow"> -->
+    <!-- <meta http-equiv="X-UA-Compatible" content="IE=edge"> -->
+    
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -30,6 +55,8 @@
             <button class="category-btn" data-category="electronics">Электроника</button>
             <button class="category-btn" data-category="clothing">Одежда</button>
             <button class="category-btn" data-category="books">Книги</button>
+            <button class="category-btn" data-category="backpack">Рюкзак</button>
+            <button class="category-btn" data-category="other">Другое</button>
         </div>
         
         <div class="products-grid" id="products-grid">
