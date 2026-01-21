@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Магазин товаров</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Главная страница - Каталог товаров -->
+    <div id="main-page" class="page active">
+        <header class="header">
+            <div class="logo-container">
+                <img src="Лого Аникин/1.png" alt="Логотип" class="logo">
+            </div>
+            <h1>Магазин товаров</h1>
+            <div class="cart-icon" id="cart-icon">
+                <span>🛒</span>
+                <span class="cart-badge" id="cart-badge">0</span>
+            </div>
+        </header>
+        
+        <div class="search-bar">
+            <input type="text" id="search-input" placeholder="Поиск товаров...">
+        </div>
+        
+        <div class="categories">
+            <button class="category-btn active" data-category="all">Все</button>
+            <button class="category-btn" data-category="electronics">Электроника</button>
+            <button class="category-btn" data-category="clothing">Одежда</button>
+            <button class="category-btn" data-category="books">Книги</button>
+        </div>
+        
+        <div class="products-grid" id="products-grid">
+            <!-- Товары будут добавлены через JavaScript -->
+        </div>
+    </div>
+    
+    <!-- Страница товара -->
+    <div id="product-page" class="page">
+        <header class="header">
+            <button class="back-btn" id="back-btn">← Назад</button>
+            <h2>Детали товара</h2>
+        </header>
+        
+        <div class="product-details" id="product-details">
+            <!-- Детали товара будут добавлены через JavaScript -->
+        </div>
+    </div>
+    
+    <!-- Страница корзины -->
+    <div id="cart-page" class="page">
+        <header class="header">
+            <button class="back-btn" id="cart-back-btn">← Назад</button>
+            <h2>Корзина</h2>
+        </header>
+        
+        <div class="cart-content" id="cart-content">
+            <div class="empty-cart" id="empty-cart">
+                <p>🛒 Ваша корзина пуста</p>
+            </div>
+            <div class="cart-items" id="cart-items">
+                <!-- Товары в корзине будут добавлены через JavaScript -->
+            </div>
+        </div>
+        
+        <div class="cart-footer" id="cart-footer">
+            <div class="cart-total">
+                <span>Итого:</span>
+                <span class="total-price" id="total-price">0 ₽</span>
+            </div>
+            <button class="checkout-btn" id="checkout-btn">Оформить заказ</button>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
