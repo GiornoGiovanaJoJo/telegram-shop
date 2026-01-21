@@ -57,7 +57,7 @@
                 <div class="form-group">
                     <label for="product-category">Категория *</label>
                     <select id="product-category" required>
-                        <option value="electronics">Рюкзак</option>
+                        <option value="electronics">Электроника</option>
                         <option value="clothing">Одежда</option>
                         <option value="books">Книги</option>
                         <option value="other">Другое</option>
@@ -70,13 +70,44 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="product-image">Изображение (URL или путь)</label>
-                    <input type="text" id="product-image" placeholder="фото/photo.jpg">
+                    <label for="product-image">Изображение товара</label>
+                    <input type="file" id="product-image-file" accept="image/*" style="margin-bottom: 10px;">
+                    <div id="image-preview-container" style="margin-bottom: 10px; display: none;">
+                        <img id="image-preview" src="" alt="Предпросмотр" style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <button type="button" id="remove-image-btn" style="margin-left: 10px; padding: 5px 10px; background: var(--error-color); color: white; border: none; border-radius: 4px; cursor: pointer;">Удалить фото</button>
+                    </div>
+                    <input type="hidden" id="product-image" placeholder="Текущее изображение">
+                    <small style="color: var(--text-secondary); display: block; margin-top: 5px;">Выберите изображение для загрузки или оставьте текущее</small>
                 </div>
 
                 <div class="form-group">
                     <label for="product-emoji">Эмодзи (fallback)</label>
                     <input type="text" id="product-emoji" placeholder="📱" maxlength="2">
+                </div>
+
+                <!-- ДОБАВЬТЕ СВОИ ПОЛЯ ЗДЕСЬ -->
+                <!-- Пример: Теги -->
+                <div class="form-group">
+                    <label for="product-tags">Теги (через запятую)</label>
+                    <input type="text" id="product-tags" placeholder="новинка, популярное, скидка">
+                </div>
+
+                <!-- Пример: Артикул -->
+                <div class="form-group">
+                    <label for="product-sku">Артикул</label>
+                    <input type="text" id="product-sku" placeholder="ART-12345">
+                </div>
+
+                <!-- Пример: В наличии -->
+                <div class="form-group">
+                    <label for="product-in-stock">В наличии</label>
+                    <input type="checkbox" id="product-in-stock" checked>
+                </div>
+
+                <!-- Пример: Рейтинг -->
+                <div class="form-group">
+                    <label for="product-rating">Рейтинг (1-5)</label>
+                    <input type="number" id="product-rating" min="1" max="5" step="0.1" placeholder="4.5">
                 </div>
 
                 <div class="form-actions">
