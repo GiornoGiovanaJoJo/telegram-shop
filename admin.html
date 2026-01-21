@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель - Управление товарами</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <div class="admin-header-content">
+                <div class="admin-logo-container">
+                    <img src="Лого Аникин/1.png" alt="Логотип" class="admin-logo">
+                </div>
+                <h1>Админ-панель</h1>
+                <button class="admin-logout-btn" id="admin-logout">Выход</button>
+            </div>
+        </header>
+
+        <div class="admin-content">
+            <!-- Список товаров -->
+            <div class="admin-section">
+                <div class="admin-section-header">
+                    <h2>Товары</h2>
+                    <button class="admin-btn admin-btn-primary" id="add-product-btn">+ Добавить товар</button>
+                </div>
+                
+                <div class="admin-products-list" id="admin-products-list">
+                    <!-- Товары будут загружены через JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно добавления/редактирования товара -->
+    <div class="modal" id="product-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Добавить товар</h3>
+                <button class="modal-close" id="modal-close">×</button>
+            </div>
+            <form id="product-form" class="product-form">
+                <input type="hidden" id="product-id">
+                
+                <div class="form-group">
+                    <label for="product-name">Название товара *</label>
+                    <input type="text" id="product-name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="product-price">Цена (₽) *</label>
+                    <input type="number" id="product-price" min="0" step="0.01" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="product-category">Категория *</label>
+                    <select id="product-category" required>
+                        <option value="electronics">Электроника</option>
+                        <option value="clothing">Одежда</option>
+                        <option value="books">Книги</option>
+                        <option value="other">Другое</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="product-description">Описание</label>
+                    <textarea id="product-description" rows="4"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="product-image">Изображение (URL или путь)</label>
+                    <input type="text" id="product-image" placeholder="фото/photo.jpg">
+                </div>
+
+                <div class="form-group">
+                    <label for="product-emoji">Эмодзи (fallback)</label>
+                    <input type="text" id="product-emoji" placeholder="📱" maxlength="2">
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="admin-btn admin-btn-secondary" id="modal-cancel">Отмена</button>
+                    <button type="submit" class="admin-btn admin-btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>
