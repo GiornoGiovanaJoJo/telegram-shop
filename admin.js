@@ -88,6 +88,24 @@ function renderProducts(products) {
                 <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 12px;">
                     ${product.description || 'Нет описания'}
                 </p>
+                ${product.tags && product.tags.length > 0 ? `
+                    <div style="margin-bottom: 8px;">
+                        <strong>Теги:</strong> ${product.tags.join(', ')}
+                    </div>
+                ` : ''}
+                ${product.sku ? `
+                    <div style="margin-bottom: 8px; font-size: 12px; color: var(--text-secondary);">
+                        Артикул: ${product.sku}
+                    </div>
+                ` : ''}
+                ${product.rating ? `
+                    <div style="margin-bottom: 8px;">
+                        ⭐ Рейтинг: ${product.rating}
+                    </div>
+                ` : ''}
+                <div style="margin-bottom: 8px;">
+                    ${product.inStock !== false ? '✅ В наличии' : '❌ Нет в наличии'}
+                </div>
                 <div class="admin-product-actions">
                     <button class="admin-btn admin-btn-primary" onclick="editProduct(${product.id})">
                         Редактировать
@@ -135,6 +153,16 @@ function setupEventListeners() {
     // Обработка формы
     document.getElementById('product-form').addEventListener('submit', handleProductSubmit);
     
+    // Обработка выбора файла для предпросмотра
+    document.getElementById('product-image-file').addEventListener('change', handleImagePreview);
+    
+    // Удаление изображения
+    document.getElementById('remove-image-btn').addEventListener('click', () => {
+        document.getElementById('product-image-file').value = '';
+        document.getElementById('product-image').value = '';
+        document.getElementById('image-preview-container').style.display = 'none';
+    });
+    
     // Выход
     document.getElementById('admin-logout').addEventListener('click', () => {
         localStorage.removeItem(ADMIN_KEY);
@@ -149,11 +177,27 @@ function setupEventListeners() {
     });
 }
 
+// Предпросмотр изображения
+function handleImagePreview(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('image-preview').src = e.target.result;
+            document.getElementById('image-preview-container').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
 // Открыть модальное окно для добавления/редактирования
 function openProductModal(product = null) {
     const modal = document.getElementById('product-modal');
     const form = document.getElementById('product-form');
     const title = document.getElementById('modal-title');
+    const imagePreviewContainer = document.getElementById('image-preview-container');
+    const imagePreview = document.getElementById('image-preview');
+    const imageFileInput = document.getElementById('product-image-file');
     
     if (product) {
         title.textContent = 'Редактировать товар';
@@ -164,10 +208,26 @@ function openProductModal(product = null) {
         document.getElementById('product-description').value = product.description || '';
         document.getElementById('product-image').value = product.image || '';
         document.getElementById('product-emoji').value = product.emoji || '';
+        // ДОБАВЬТЕ ЗДЕСЬ: заполнение ваших новых полей
+        document.getElementById('product-tags').value = product.tags || '';
+        document.getElementById('product-sku').value = product.sku || '';
+        document.getElementById('product-in-stock').checked = product.inStock !== false; // по умолчанию true
+        document.getElementById('product-rating').value = product.rating || '';
+        
+        // Показываем текущее изображение, если оно есть
+        if (product.image) {
+            imagePreview.src = product.image;
+            imagePreviewContainer.style.display = 'block';
+        } else {
+            imagePreviewContainer.style.display = 'none';
+        }
+        imageFileInput.value = ''; // Сбрасываем выбор файла
     } else {
         title.textContent = 'Добавить товар';
         form.reset();
         document.getElementById('product-id').value = '';
+        imagePreviewContainer.style.display = 'none';
+        imageFileInput.value = '';
     }
     
     modal.classList.add('active');
@@ -177,6 +237,8 @@ function openProductModal(product = null) {
 function closeProductModal() {
     document.getElementById('product-modal').classList.remove('active');
     document.getElementById('product-form').reset();
+    document.getElementById('image-preview-container').style.display = 'none';
+    document.getElementById('product-image-file').value = '';
 }
 
 // Редактировать товар
@@ -218,41 +280,91 @@ async function deleteProduct(id) {
 async function handleProductSubmit(e) {
     e.preventDefault();
     
-    const formData = {
-        id: document.getElementById('product-id').value || null,
-        name: document.getElementById('product-name').value,
-        price: parseFloat(document.getElementById('product-price').value),
-        category: document.getElementById('product-category').value,
-        description: document.getElementById('product-description').value,
-        image: document.getElementById('product-image').value,
-        emoji: document.getElementById('product-emoji').value || '📦'
-    };
+    const productId = document.getElementById('product-id').value || null;
+    const imageFile = document.getElementById('product-image-file').files[0];
+    const currentImage = document.getElementById('product-image').value;
     
     try {
-        const url = formData.id 
-            ? `${API_BASE}/api/products/${formData.id}`
+        let imagePath = currentImage;
+        
+        const url = productId 
+            ? `${API_BASE}/api/products/${productId}`
             : `${API_BASE}/api/products`;
         
-        const method = formData.id ? 'PUT' : 'POST';
+        const method = productId ? 'PUT' : 'POST';
+        
+        // Используем FormData если есть файл, иначе JSON
+        let requestBody;
+        let headers = {};
+        
+        if (imageFile) {
+            // Используем FormData для отправки файла
+            const formData = new FormData();
+            formData.append('image', imageFile);
+            formData.append('name', document.getElementById('product-name').value);
+            formData.append('price', document.getElementById('product-price').value);
+            formData.append('category', document.getElementById('product-category').value);
+            formData.append('description', document.getElementById('product-description').value);
+            formData.append('emoji', document.getElementById('product-emoji').value || '📦');
+            
+            const tagsValue = document.getElementById('product-tags').value;
+            if (tagsValue) {
+                const tags = tagsValue.split(',').map(t => t.trim()).filter(t => t);
+                formData.append('tags', JSON.stringify(tags));
+            }
+            
+            formData.append('sku', document.getElementById('product-sku').value || '');
+            formData.append('inStock', document.getElementById('product-in-stock').checked);
+            
+            const ratingValue = document.getElementById('product-rating').value;
+            if (ratingValue) {
+                formData.append('rating', ratingValue);
+            }
+            
+            // Если обновляем товар и есть текущее изображение, передаем его
+            if (productId && currentImage && !imageFile) {
+                formData.append('image', currentImage);
+            }
+            
+            requestBody = formData;
+            // Не устанавливаем Content-Type для FormData, браузер сделает это сам
+        } else {
+            // Для создания или обновления без файла используем JSON
+            const productData = {
+                id: productId,
+                name: document.getElementById('product-name').value,
+                price: parseFloat(document.getElementById('product-price').value),
+                category: document.getElementById('product-category').value,
+                description: document.getElementById('product-description').value,
+                image: currentImage,
+                emoji: document.getElementById('product-emoji').value || '📦',
+                tags: document.getElementById('product-tags').value.split(',').map(t => t.trim()).filter(t => t),
+                sku: document.getElementById('product-sku').value || '',
+                inStock: document.getElementById('product-in-stock').checked,
+                rating: parseFloat(document.getElementById('product-rating').value) || null
+            };
+            
+            requestBody = JSON.stringify(productData);
+            headers['Content-Type'] = 'application/json';
+        }
         
         const response = await fetch(url, {
             method: method,
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(formData)
+            headers: headers,
+            body: requestBody
         });
         
         if (response.ok) {
             closeProductModal();
             loadProducts();
-            alert(formData.id ? 'Товар обновлен' : 'Товар добавлен');
+            alert(productId ? 'Товар обновлен' : 'Товар добавлен');
         } else {
-            throw new Error('Ошибка сохранения');
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Ошибка сохранения');
         }
     } catch (error) {
         console.error('Ошибка сохранения товара:', error);
-        alert('Ошибка сохранения товара');
+        alert('Ошибка сохранения товара: ' + error.message);
     }
 }
 
