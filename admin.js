@@ -125,6 +125,7 @@ function getCategoryName(category) {
         'electronics': 'Электроника',
         'clothing': 'Одежда',
         'books': 'Книги',
+        'backpack': 'Рюкзак',
         'other': 'Другое'
     };
     return categories[category] || category;
@@ -163,6 +164,36 @@ function setupEventListeners() {
         document.getElementById('image-preview-container').style.display = 'none';
     });
     
+    // Обработка выбора категории
+    const categorySelect = document.getElementById('product-category-select');
+    const categoryCustom = document.getElementById('product-category-custom');
+    const categoryHidden = document.getElementById('product-category');
+    
+    categorySelect.addEventListener('change', () => {
+        const selectedValue = categorySelect.value;
+        if (selectedValue === 'custom') {
+            categoryCustom.style.display = 'block';
+            categoryCustom.required = true;
+            categorySelect.required = false;
+            categoryHidden.value = '';
+        } else if (selectedValue) {
+            categoryCustom.style.display = 'none';
+            categoryCustom.required = false;
+            categorySelect.required = true;
+            categoryHidden.value = selectedValue;
+        } else {
+            categoryCustom.style.display = 'none';
+            categoryCustom.required = false;
+            categorySelect.required = true;
+            categoryHidden.value = '';
+        }
+    });
+    
+    // Обработка ввода категории вручную
+    categoryCustom.addEventListener('input', () => {
+        categoryHidden.value = categoryCustom.value.trim();
+    });
+    
     // Выход
     document.getElementById('admin-logout').addEventListener('click', () => {
         localStorage.removeItem(ADMIN_KEY);
@@ -199,12 +230,15 @@ function openProductModal(product = null) {
     const imagePreview = document.getElementById('image-preview');
     const imageFileInput = document.getElementById('product-image-file');
     
+    const categorySelect = document.getElementById('product-category-select');
+    const categoryCustom = document.getElementById('product-category-custom');
+    const categoryHidden = document.getElementById('product-category');
+    
     if (product) {
         title.textContent = 'Редактировать товар';
         document.getElementById('product-id').value = product.id;
         document.getElementById('product-name').value = product.name;
         document.getElementById('product-price').value = product.price;
-        document.getElementById('product-category').value = product.category;
         document.getElementById('product-description').value = product.description || '';
         document.getElementById('product-image').value = product.image || '';
         document.getElementById('product-emoji').value = product.emoji || '';
@@ -213,6 +247,33 @@ function openProductModal(product = null) {
         document.getElementById('product-sku').value = product.sku || '';
         document.getElementById('product-in-stock').checked = product.inStock !== false; // по умолчанию true
         document.getElementById('product-rating').value = product.rating || '';
+        
+        // Обработка категории
+        const categoryValue = product.category || '';
+        const standardCategories = ['electronics', 'clothing', 'books', 'backpack', 'other'];
+        if (standardCategories.includes(categoryValue)) {
+            categorySelect.value = categoryValue;
+            categoryCustom.style.display = 'none';
+            categoryCustom.required = false;
+            categorySelect.required = true;
+            categoryCustom.value = '';
+            categoryHidden.value = categoryValue;
+        } else if (categoryValue) {
+            // Кастомная категория
+            categorySelect.value = 'custom';
+            categoryCustom.style.display = 'block';
+            categoryCustom.required = true;
+            categorySelect.required = false;
+            categoryCustom.value = categoryValue;
+            categoryHidden.value = categoryValue;
+        } else {
+            categorySelect.value = '';
+            categoryCustom.style.display = 'none';
+            categoryCustom.required = false;
+            categorySelect.required = true;
+            categoryCustom.value = '';
+            categoryHidden.value = '';
+        }
         
         // Показываем текущее изображение, если оно есть
         if (product.image) {
@@ -226,6 +287,12 @@ function openProductModal(product = null) {
         title.textContent = 'Добавить товар';
         form.reset();
         document.getElementById('product-id').value = '';
+        categorySelect.value = '';
+        categoryCustom.style.display = 'none';
+        categoryCustom.required = false;
+        categorySelect.required = true;
+        categoryCustom.value = '';
+        categoryHidden.value = '';
         imagePreviewContainer.style.display = 'none';
         imageFileInput.value = '';
     }
@@ -239,6 +306,17 @@ function closeProductModal() {
     document.getElementById('product-form').reset();
     document.getElementById('image-preview-container').style.display = 'none';
     document.getElementById('product-image-file').value = '';
+    
+    // Сброс полей категории
+    const categorySelect = document.getElementById('product-category-select');
+    const categoryCustom = document.getElementById('product-category-custom');
+    const categoryHidden = document.getElementById('product-category');
+    categorySelect.value = '';
+    categoryCustom.style.display = 'none';
+    categoryCustom.required = false;
+    categorySelect.required = true;
+    categoryCustom.value = '';
+    categoryHidden.value = '';
 }
 
 // Редактировать товар
@@ -284,6 +362,13 @@ async function handleProductSubmit(e) {
     const imageFile = document.getElementById('product-image-file').files[0];
     const currentImage = document.getElementById('product-image').value;
     
+    // Получаем категорию из скрытого поля (которое обновляется через обработчики событий)
+    const categoryValue = document.getElementById('product-category').value.trim();
+    if (!categoryValue) {
+        alert('Пожалуйста, выберите или введите категорию');
+        return;
+    }
+    
     try {
         let imagePath = currentImage;
         
@@ -303,7 +388,7 @@ async function handleProductSubmit(e) {
             formData.append('image', imageFile);
             formData.append('name', document.getElementById('product-name').value);
             formData.append('price', document.getElementById('product-price').value);
-            formData.append('category', document.getElementById('product-category').value);
+            formData.append('category', categoryValue);
             formData.append('description', document.getElementById('product-description').value);
             formData.append('emoji', document.getElementById('product-emoji').value || '📦');
             
@@ -334,7 +419,7 @@ async function handleProductSubmit(e) {
                 id: productId,
                 name: document.getElementById('product-name').value,
                 price: parseFloat(document.getElementById('product-price').value),
-                category: document.getElementById('product-category').value,
+                category: categoryValue,
                 description: document.getElementById('product-description').value,
                 image: currentImage,
                 emoji: document.getElementById('product-emoji').value || '📦',
@@ -354,13 +439,25 @@ async function handleProductSubmit(e) {
             body: requestBody
         });
         
+        // Проверяем тип ответа перед парсингом
+        const contentType = response.headers.get('content-type');
+        let responseData;
+        
+        if (contentType && contentType.includes('application/json')) {
+            responseData = await response.json();
+        } else {
+            // Если сервер вернул не JSON (например, HTML с ошибкой), читаем как текст
+            const text = await response.text();
+            console.error('Сервер вернул не JSON:', text.substring(0, 200));
+            throw new Error('Сервер вернул некорректный ответ. Проверьте консоль сервера.');
+        }
+        
         if (response.ok) {
             closeProductModal();
             loadProducts();
             alert(productId ? 'Товар обновлен' : 'Товар добавлен');
         } else {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Ошибка сохранения');
+            throw new Error(responseData.error || 'Ошибка сохранения');
         }
     } catch (error) {
         console.error('Ошибка сохранения товара:', error);
