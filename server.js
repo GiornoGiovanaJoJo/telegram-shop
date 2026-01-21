@@ -2,6 +2,7 @@
 const express = require('express');
 const axios = require('axios');
 const path = require('path');
+const multer = require('multer');
 
 // Поддержка переменных окружения для хостинга
 let config;
@@ -19,9 +20,47 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const fs = require('fs').promises;
 
+// Настройка multer для загрузки файлов
+const uploadsDir = path.join(__dirname, 'фото');
+// Создаем папку для загрузок, если её нет
+fs.mkdir(uploadsDir, { recursive: true }).catch(() => {});
+
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, uploadsDir);
+    },
+    filename: function (req, file, cb) {
+        // Генерируем уникальное имя файла: timestamp + оригинальное имя
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        const name = path.basename(file.originalname, ext);
+        cb(null, name + '-' + uniqueSuffix + ext);
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB максимум
+    },
+    fileFilter: function (req, file, cb) {
+        // Разрешаем только изображения
+        const allowedTypes = /jpeg|jpg|png|gif|webp/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+        
+        if (mimetype && extname) {
+            return cb(null, true);
+        } else {
+            cb(new Error('Разрешены только изображения (jpeg, jpg, png, gif, webp)'));
+        }
+    }
+});
+
 // Middleware
 app.use(express.json());
 app.use(express.static(__dirname));
+app.use('/фото', express.static(uploadsDir));
 
 // Функции для работы с товарами
 const PRODUCTS_FILE = path.join(__dirname, 'products.json');
@@ -184,18 +223,64 @@ app.get('/api/products/:id', async (req, res) => {
     }
 });
 
-// Создать новый товар
-app.post('/api/products', async (req, res) => {
+// Endpoint для загрузки изображения товара
+app.post('/api/upload', upload.single('image'), (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'Файл не был загружен' });
+        }
+        
+        // Возвращаем путь к файлу относительно корня проекта
+        const imagePath = `фото/${req.file.filename}`;
+        res.json({ 
+            success: true, 
+            image: imagePath,
+            filename: req.file.filename
+        });
+    } catch (error) {
+        console.error('Ошибка загрузки файла:', error);
+        res.status(500).json({ error: 'Ошибка загрузки файла: ' + error.message });
+    }
+});
+
+// Создать новый товар (с поддержкой загрузки файла)
+app.post('/api/products', upload.single('image'), async (req, res) => {
     try {
         const products = await loadProducts();
+        
+        // Если загружен файл, используем его путь
+        let imagePath = req.body.image || '';
+        if (req.file) {
+            imagePath = `фото/${req.file.filename}`;
+        }
+        
+        // Обработка тегов (может быть строкой или массивом)
+        let tags = [];
+        if (req.body.tags) {
+            if (typeof req.body.tags === 'string') {
+                try {
+                    tags = JSON.parse(req.body.tags);
+                } catch {
+                    tags = req.body.tags.split(',').map(t => t.trim()).filter(t => t);
+                }
+            } else if (Array.isArray(req.body.tags)) {
+                tags = req.body.tags;
+            }
+        }
+        
         const newProduct = {
             id: products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1,
             name: req.body.name,
             price: parseFloat(req.body.price),
             category: req.body.category,
             description: req.body.description || '',
-            image: req.body.image || '',
-            emoji: req.body.emoji || '📦'
+            image: imagePath,
+            emoji: req.body.emoji || '📦',
+            // ДОБАВЬТЕ ЗДЕСЬ: сохранение ваших новых полей
+            tags: tags,
+            sku: req.body.sku || '',
+            inStock: req.body.inStock !== undefined ? (req.body.inStock === 'true' || req.body.inStock === true) : true,
+            rating: req.body.rating ? parseFloat(req.body.rating) : null
         };
         
         products.push(newProduct);
@@ -208,8 +293,8 @@ app.post('/api/products', async (req, res) => {
     }
 });
 
-// Обновить товар
-app.put('/api/products/:id', async (req, res) => {
+// Обновить товар (с поддержкой загрузки файла)
+app.put('/api/products/:id', upload.single('image'), async (req, res) => {
     try {
         const products = await loadProducts();
         const index = products.findIndex(p => p.id === parseInt(req.params.id));
@@ -218,14 +303,44 @@ app.put('/api/products/:id', async (req, res) => {
             return res.status(404).json({ error: 'Товар не найден' });
         }
         
+        // Если загружен новый файл, используем его путь
+        let imagePath = req.body.image || products[index].image;
+        if (req.file) {
+            imagePath = `фото/${req.file.filename}`;
+            // Опционально: удаляем старое изображение, если оно было загружено ранее
+            if (products[index].image && products[index].image.startsWith('фото/')) {
+                const oldImagePath = path.join(__dirname, products[index].image);
+                fs.unlink(oldImagePath).catch(() => {}); // Игнорируем ошибки удаления
+            }
+        }
+        
+        // Обработка тегов (может быть строкой или массивом)
+        let tags = products[index].tags || [];
+        if (req.body.tags !== undefined) {
+            if (typeof req.body.tags === 'string') {
+                try {
+                    tags = JSON.parse(req.body.tags);
+                } catch {
+                    tags = req.body.tags.split(',').map(t => t.trim()).filter(t => t);
+                }
+            } else if (Array.isArray(req.body.tags)) {
+                tags = req.body.tags;
+            }
+        }
+        
         products[index] = {
             ...products[index],
             name: req.body.name,
             price: parseFloat(req.body.price),
             category: req.body.category,
             description: req.body.description || '',
-            image: req.body.image || '',
-            emoji: req.body.emoji || products[index].emoji
+            image: imagePath,
+            emoji: req.body.emoji || products[index].emoji,
+            // ДОБАВЬТЕ ЗДЕСЬ: обновление ваших новых полей
+            tags: tags,
+            sku: req.body.sku !== undefined ? req.body.sku : products[index].sku || '',
+            inStock: req.body.inStock !== undefined ? (req.body.inStock === 'true' || req.body.inStock === true) : products[index].inStock !== false,
+            rating: req.body.rating ? parseFloat(req.body.rating) : (products[index].rating || null)
         };
         
         await saveProducts(products);
@@ -240,12 +355,19 @@ app.put('/api/products/:id', async (req, res) => {
 app.delete('/api/products/:id', async (req, res) => {
     try {
         const products = await loadProducts();
-        const filteredProducts = products.filter(p => p.id !== parseInt(req.params.id));
+        const productToDelete = products.find(p => p.id === parseInt(req.params.id));
         
-        if (products.length === filteredProducts.length) {
+        if (!productToDelete) {
             return res.status(404).json({ error: 'Товар не найден' });
         }
         
+        // Удаляем изображение товара, если оно было загружено
+        if (productToDelete.image && productToDelete.image.startsWith('фото/')) {
+            const imagePath = path.join(__dirname, productToDelete.image);
+            fs.unlink(imagePath).catch(() => {}); // Игнорируем ошибки удаления
+        }
+        
+        const filteredProducts = products.filter(p => p.id !== parseInt(req.params.id));
         await saveProducts(filteredProducts);
         res.json({ success: true, message: 'Товар удален' });
     } catch (error) {
