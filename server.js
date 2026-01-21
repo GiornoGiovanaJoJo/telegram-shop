@@ -17,10 +17,34 @@ const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || config.ADMIN_CHAT_ID;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const fs = require('fs').promises;
 
 // Middleware
 app.use(express.json());
 app.use(express.static(__dirname));
+
+// Функции для работы с товарами
+const PRODUCTS_FILE = path.join(__dirname, 'products.json');
+
+async function loadProducts() {
+    try {
+        const data = await fs.readFile(PRODUCTS_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('Ошибка загрузки товаров:', error);
+        return [];
+    }
+}
+
+async function saveProducts(products) {
+    try {
+        await fs.writeFile(PRODUCTS_FILE, JSON.stringify(products, null, 2), 'utf8');
+        return true;
+    } catch (error) {
+        console.error('Ошибка сохранения товаров:', error);
+        return false;
+    }
+}
 
 // Функция для отправки сообщения в Telegram
 async function sendTelegramMessage(chatId, text, parseMode = 'HTML') {
@@ -128,17 +152,153 @@ app.post('/api/order', async (req, res) => {
     }
 });
 
+// ============================================
+// API для управления товарами (CRUD)
+// ============================================
+
+// Получить все товары
+app.get('/api/products', async (req, res) => {
+    try {
+        const products = await loadProducts();
+        res.json(products);
+    } catch (error) {
+        console.error('Ошибка получения товаров:', error);
+        res.status(500).json({ error: 'Ошибка получения товаров' });
+    }
+});
+
+// Получить товар по ID
+app.get('/api/products/:id', async (req, res) => {
+    try {
+        const products = await loadProducts();
+        const product = products.find(p => p.id === parseInt(req.params.id));
+        
+        if (!product) {
+            return res.status(404).json({ error: 'Товар не найден' });
+        }
+        
+        res.json(product);
+    } catch (error) {
+        console.error('Ошибка получения товара:', error);
+        res.status(500).json({ error: 'Ошибка получения товара' });
+    }
+});
+
+// Создать новый товар
+app.post('/api/products', async (req, res) => {
+    try {
+        const products = await loadProducts();
+        const newProduct = {
+            id: products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1,
+            name: req.body.name,
+            price: parseFloat(req.body.price),
+            category: req.body.category,
+            description: req.body.description || '',
+            image: req.body.image || '',
+            emoji: req.body.emoji || '📦'
+        };
+        
+        products.push(newProduct);
+        await saveProducts(products);
+        
+        res.status(201).json(newProduct);
+    } catch (error) {
+        console.error('Ошибка создания товара:', error);
+        res.status(500).json({ error: 'Ошибка создания товара' });
+    }
+});
+
+// Обновить товар
+app.put('/api/products/:id', async (req, res) => {
+    try {
+        const products = await loadProducts();
+        const index = products.findIndex(p => p.id === parseInt(req.params.id));
+        
+        if (index === -1) {
+            return res.status(404).json({ error: 'Товар не найден' });
+        }
+        
+        products[index] = {
+            ...products[index],
+            name: req.body.name,
+            price: parseFloat(req.body.price),
+            category: req.body.category,
+            description: req.body.description || '',
+            image: req.body.image || '',
+            emoji: req.body.emoji || products[index].emoji
+        };
+        
+        await saveProducts(products);
+        res.json(products[index]);
+    } catch (error) {
+        console.error('Ошибка обновления товара:', error);
+        res.status(500).json({ error: 'Ошибка обновления товара' });
+    }
+});
+
+// Удалить товар
+app.delete('/api/products/:id', async (req, res) => {
+    try {
+        const products = await loadProducts();
+        const filteredProducts = products.filter(p => p.id !== parseInt(req.params.id));
+        
+        if (products.length === filteredProducts.length) {
+            return res.status(404).json({ error: 'Товар не найден' });
+        }
+        
+        await saveProducts(filteredProducts);
+        res.json({ success: true, message: 'Товар удален' });
+    } catch (error) {
+        console.error('Ошибка удаления товара:', error);
+        res.status(500).json({ error: 'Ошибка удаления товара' });
+    }
+});
+
+// ============================================
+// API для платежей (подготовка, пока неактивно)
+// ============================================
+
+// Создать платеж (заглушка)
+app.post('/api/payment/create', async (req, res) => {
+    // TODO: Интеграция с платежными системами
+    // Пока возвращаем заглушку
+    res.json({
+        success: false,
+        message: 'Платежная система пока не активирована',
+        paymentEnabled: false
+    });
+});
+
+// Проверить статус платежа (заглушка)
+app.get('/api/payment/status/:id', async (req, res) => {
+    res.json({
+        success: false,
+        message: 'Платежная система пока не активирована'
+    });
+});
+
+// ============================================
 // Проверка здоровья сервера
+// ============================================
+
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// ============================================
+// Страницы
+// ============================================
 
 // Главная страница
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Запуск сервера
+// Админ-панель
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
 // Запуск сервера
 app.listen(PORT, '0.0.0.0', () => {
     console.log('===================================');
