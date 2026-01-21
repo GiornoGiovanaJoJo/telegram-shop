@@ -56,12 +56,18 @@
 
                 <div class="form-group">
                     <label for="product-category">Категория *</label>
-                    <select id="product-category" required>
+                    <select id="product-category-select" required style="margin-bottom: 10px;">
+                        <option value="">-- Выберите категорию --</option>
                         <option value="electronics">Электроника</option>
                         <option value="clothing">Одежда</option>
                         <option value="books">Книги</option>
+                        <option value="backpack">Рюкзак</option>
                         <option value="other">Другое</option>
+                        <option value="custom">Ввести вручную</option>
                     </select>
+                    <input type="text" id="product-category-custom" placeholder="Введите название категории" style="display: none; width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px;">
+                    <input type="hidden" id="product-category" required>
+                    <small style="color: var(--text-secondary); display: block; margin-top: 5px;">Выберите категорию из списка или введите свою</small>
                 </div>
 
                 <div class="form-group">
