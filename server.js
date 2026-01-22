@@ -527,13 +527,17 @@ app.get('/api/payment/status/:paymentId', async (req, res) => {
 });
 
 // Вебхук для получения уведомлений от Т-Банк
-app.post('/api/payment/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+app.post('/api/payment/webhook', express.json(), async (req, res) => {
     try {
         if (!tinkoffPayment.isConfigured()) {
             return res.status(400).json({ error: 'Платежная система не настроена' });
         }
 
-        const webhookData = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+        const webhookData = req.body;
+        
+        if (!webhookData) {
+            return res.status(400).json({ error: 'Пустое тело запроса' });
+        }
         
         // Обрабатываем вебхук
         const result = await tinkoffPayment.handleWebhook(webhookData);
@@ -563,11 +567,14 @@ app.post('/api/payment/webhook', express.raw({ type: 'application/json' }), asyn
             );
         }
 
-        res.json({ success: true });
+        // Т-Банк требует ответ "OK" заглавными буквами
+        res.status(200).send('OK');
 
     } catch (error) {
         console.error('Ошибка обработки вебхука:', error);
-        res.status(500).json({ error: 'Ошибка обработки вебхука' });
+        console.error('Stack trace:', error.stack);
+        // Всегда возвращаем 200 OK, чтобы Т-Банк не повторял запрос
+        res.status(200).send('OK');
     }
 });
 

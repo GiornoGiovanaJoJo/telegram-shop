@@ -93,19 +93,43 @@ async function createPayment(paymentData) {
         }
 
         // Создаем платеж через библиотеку
-        const response = await tbankSDK.initPayment(initData);
+        let response;
+        try {
+            response = await tbankSDK.initPayment(initData);
+        } catch (libError) {
+            // Если библиотека выбрасывает ошибку, логируем и пробрасываем
+            console.error('Ошибка библиотеки tbank-payments:', libError);
+            console.error('Данные запроса:', JSON.stringify(initData, null, 2));
+            
+            // Если это ошибка API, извлекаем сообщение
+            if (libError.response) {
+                const apiError = libError.response.data || libError.response;
+                throw new Error(apiError.Message || apiError.ErrorMessage || apiError.Details || libError.message);
+            }
+            
+            throw libError;
+        }
 
-        if (response.Success === 'true' || response.Success === true) {
+        // Проверяем формат ответа
+        if (!response) {
+            throw new Error('Библиотека вернула пустой ответ');
+        }
+
+        // Обрабатываем разные форматы ответа
+        const success = response.Success === 'true' || response.Success === true || response.success === true;
+        
+        if (success) {
             return {
                 success: true,
-                paymentId: response.PaymentId,
-                paymentUrl: response.PaymentURL,
-                orderId: response.OrderId,
-                amount: response.Amount,
-                status: response.Status
+                paymentId: response.PaymentId || response.paymentId,
+                paymentUrl: response.PaymentURL || response.paymentUrl || response.PaymentUrl,
+                orderId: response.OrderId || response.orderId,
+                amount: response.Amount || response.amount,
+                status: response.Status || response.status
             };
         } else {
-            const errorMessage = response.Message || response.ErrorMessage || response.Details || 'Ошибка создания платежа';
+            const errorMessage = response.Message || response.ErrorMessage || response.Details || 
+                               response.message || response.error || 'Ошибка создания платежа';
             console.error('Ошибка создания платежа. Ответ от Т-Банк:', JSON.stringify(response, null, 2));
             throw new Error(errorMessage);
         }
