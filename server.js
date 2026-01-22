@@ -671,6 +671,19 @@ app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
+// Страницы с документами
+app.get('/offer', (req, res) => {
+    res.sendFile(path.join(__dirname, 'offer.html'));
+});
+
+app.get('/privacy', (req, res) => {
+    res.sendFile(path.join(__dirname, 'privacy.html'));
+});
+
+app.get('/delivery', (req, res) => {
+    res.sendFile(path.join(__dirname, 'delivery.html'));
+});
+
 // Запуск сервера
 app.listen(PORT, '0.0.0.0', () => {
     console.log('===================================');
