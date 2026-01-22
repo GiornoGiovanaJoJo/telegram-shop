@@ -82,28 +82,28 @@ function renderProducts(products) {
                 ${product.emoji || '📦'}
             </div>
             <div class="admin-product-info">
-                <h3>${product.name}</h3>
+                <h3 style="word-wrap: break-word; overflow-wrap: break-word; max-width: 100%;">${product.name}</h3>
                 <div class="admin-product-price">${formatPrice(product.price)}</div>
                 <div class="admin-product-category">${getCategoryName(product.category)}</div>
-                <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 12px;">
+                <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 12px; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; max-width: 100%; white-space: normal;">
                     ${product.description || 'Нет описания'}
                 </p>
                 ${product.tags && product.tags.length > 0 ? `
-                    <div style="margin-bottom: 8px;">
+                    <div style="margin-bottom: 8px; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%;">
                         <strong>Теги:</strong> ${product.tags.join(', ')}
                     </div>
                 ` : ''}
                 ${product.sku ? `
-                    <div style="margin-bottom: 8px; font-size: 12px; color: var(--text-secondary);">
+                    <div style="margin-bottom: 8px; font-size: 12px; color: var(--text-secondary); word-wrap: break-word; overflow-wrap: break-word; max-width: 100%;">
                         Артикул: ${product.sku}
                     </div>
                 ` : ''}
                 ${product.rating ? `
-                    <div style="margin-bottom: 8px;">
+                    <div style="margin-bottom: 8px; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%;">
                         ⭐ Рейтинг: ${product.rating}
                     </div>
                 ` : ''}
-                <div style="margin-bottom: 8px;">
+                <div style="margin-bottom: 8px; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%;">
                     ${product.inStock !== false ? '✅ В наличии' : '❌ Нет в наличии'}
                 </div>
                 <div class="admin-product-actions">
