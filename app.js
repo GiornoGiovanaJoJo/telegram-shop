@@ -69,8 +69,12 @@ const elements = {
     paymentFormClose: document.getElementById('payment-form-close'),
     paymentFormCancel: document.getElementById('payment-form-cancel'),
     paymentFormSubmit: document.getElementById('payment-form-submit'),
+    paymentFio: document.getElementById('payment-fio'),
     paymentEmail: document.getElementById('payment-email'),
-    paymentPhone: document.getElementById('payment-phone')
+    paymentPhone: document.getElementById('payment-phone'),
+    paymentCity: document.getElementById('payment-city'),
+    paymentAddress: document.getElementById('payment-address'),
+    paymentPostal: document.getElementById('payment-postal')
 };
 
 // Инициализация
@@ -347,6 +351,12 @@ function showPaymentForm() {
     const userInfo = tg.initDataUnsafe?.user || null;
     
     // Заполняем форму данными из Telegram, если они есть
+    if (userInfo?.first_name || userInfo?.last_name) {
+        const fullName = `${userInfo.first_name || ''} ${userInfo.last_name || ''}`.trim();
+        if (fullName) {
+            elements.paymentFio.value = fullName;
+        }
+    }
     if (userInfo?.email) {
         elements.paymentEmail.value = userInfo.email;
     }
@@ -357,11 +367,13 @@ function showPaymentForm() {
     // Показываем модальное окно
     elements.paymentModal.classList.add('active');
     
-    // Фокус на первое поле
-    if (!elements.paymentEmail.value) {
-        elements.paymentEmail.focus();
+    // Фокус на первое обязательное поле
+    if (!elements.paymentFio.value) {
+        elements.paymentFio.focus();
     } else if (!elements.paymentPhone.value) {
         elements.paymentPhone.focus();
+    } else if (!elements.paymentCity.value) {
+        elements.paymentCity.focus();
     }
 }
 
@@ -372,12 +384,41 @@ function closePaymentForm() {
 
 // Обработка отправки формы платежа
 async function handlePaymentFormSubmit() {
+    const fio = elements.paymentFio.value.trim();
     const email = elements.paymentEmail.value.trim();
     const phone = elements.paymentPhone.value.trim();
+    const city = elements.paymentCity.value.trim();
+    const address = elements.paymentAddress.value.trim();
+    const postal = elements.paymentPostal.value.trim();
     
-    // Проверяем, что указан хотя бы email или phone
+    // Валидация обязательных полей
+    if (!fio) {
+        tg.showAlert('⚠️ Пожалуйста, укажите ФИО');
+        elements.paymentFio.focus();
+        return;
+    }
+    
+    if (!phone) {
+        tg.showAlert('⚠️ Пожалуйста, укажите номер телефона');
+        elements.paymentPhone.focus();
+        return;
+    }
+    
+    // Проверяем, что указан хотя бы email или phone для чека
     if (!email && !phone) {
         tg.showAlert('⚠️ Пожалуйста, укажите Email или Телефон для получения чека');
+        return;
+    }
+    
+    if (!city) {
+        tg.showAlert('⚠️ Пожалуйста, укажите город');
+        elements.paymentCity.focus();
+        return;
+    }
+    
+    if (!address) {
+        tg.showAlert('⚠️ Пожалуйста, укажите адрес доставки');
+        elements.paymentAddress.focus();
         return;
     }
     
@@ -388,8 +429,8 @@ async function handlePaymentFormSubmit() {
         return;
     }
     
-    // Валидация телефона, если указан
-    if (phone && !isValidPhone(phone)) {
+    // Валидация телефона
+    if (!isValidPhone(phone)) {
         tg.showAlert('⚠️ Пожалуйста, укажите корректный номер телефона');
         elements.paymentPhone.focus();
         return;
@@ -399,7 +440,14 @@ async function handlePaymentFormSubmit() {
     closePaymentForm();
     
     // Продолжаем оформление заказа с указанными данными
-    await handleCheckout(email, phone);
+    await handleCheckout({
+        email,
+        phone,
+        fio,
+        city,
+        address,
+        postal
+    });
 }
 
 // Валидация email
@@ -418,7 +466,7 @@ function isValidPhone(phone) {
 }
 
 // Оформление заказа
-async function handleCheckout(email = '', phone = '') {
+async function handleCheckout(deliveryData = {}) {
     if (state.cart.length === 0) return;
 
     const total = state.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -441,7 +489,7 @@ async function handleCheckout(email = '', phone = '') {
             ? 'http://localhost:3000/api/order'
             : '/api/order';
 
-        // Отправляем заказ на сервер
+        // Отправляем заказ на сервер с данными доставки
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
@@ -450,7 +498,15 @@ async function handleCheckout(email = '', phone = '') {
             body: JSON.stringify({
                 orderData: {
                     items: state.cart,
-                    total: total
+                    total: total,
+                    delivery: {
+                        fio: deliveryData.fio || '',
+                        email: deliveryData.email || '',
+                        phone: deliveryData.phone || '',
+                        city: deliveryData.city || '',
+                        address: deliveryData.address || '',
+                        postal: deliveryData.postal || ''
+                    }
                 },
                 userInfo: userInfo
             })
@@ -471,8 +527,8 @@ async function handleCheckout(email = '', phone = '') {
                 // Используем данные из формы или из Telegram
                 const customerData = {
                     id: userInfo?.id,
-                    email: email || userInfo?.email || '',
-                    phone: phone || userInfo?.phone || ''
+                    email: deliveryData.email || userInfo?.email || '',
+                    phone: deliveryData.phone || userInfo?.phone || ''
                 };
 
                 const paymentResponse = await fetch(paymentApiUrl, {

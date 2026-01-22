@@ -143,17 +143,16 @@ app.post('/api/order', async (req, res) => {
         // Формируем сообщение о заказе
         const orderMessage = formatOrderMessage(orderData, userInfo);
         
-        // Сохраняем заказ в БД
+        // Сохраняем заказ в БД с данными доставки
         const orderId = await db.createOrder({
             userInfo: userInfo,
             items: orderData.items,
-            total: orderData.total
+            total: orderData.total,
+            delivery: orderData.delivery || null
         });
         
-        // Отправляем заказ администратору (если указан)
-        if (ADMIN_CHAT_ID) {
-            await sendTelegramMessage(ADMIN_CHAT_ID, orderMessage);
-        }
+        // НЕ отправляем уведомление администратору при создании заказа
+        // Уведомление будет отправлено только после успешной оплаты через вебхук
         
         // Отправляем подтверждение пользователю (если есть его chat_id)
         if (userInfo && userInfo.id) {
@@ -576,20 +575,82 @@ app.post('/api/payment/webhook', express.json(), async (req, res) => {
         // Обновляем статус заказа
         if (result.status === 'CONFIRMED' || result.status === 'COMPLETED') {
             await db.updateOrderStatus(result.orderId, 'confirmed');
-        }
-
-        // Отправляем уведомление администратору
-        if (ADMIN_CHAT_ID) {
-            const statusText = result.status === 'CONFIRMED' || result.status === 'COMPLETED' 
-                ? '✅ Оплачен' 
-                : result.status === 'REJECTED' || result.status === 'CANCELED'
-                ? '❌ Отклонен'
-                : '⏳ В обработке';
             
-            await sendTelegramMessage(
-                ADMIN_CHAT_ID,
-                `💳 Платеж обновлен\n\nЗаказ: #${result.orderId}\nСтатус: ${statusText}\nСумма: ${formatPrice(result.amount / 100)}`
-            );
+            // Отправляем полную информацию администратору только после успешной оплаты
+            if (ADMIN_CHAT_ID) {
+                try {
+                    // Получаем полную информацию о заказе
+                    const order = await db.getOrderById(result.orderId);
+                    
+                    if (order) {
+                        // Формируем сообщение с полной информацией
+                        let message = `✅ <b>НОВЫЙ ОПЛАЧЕННЫЙ ЗАКАЗ</b>\n\n`;
+                        message += `📦 <b>Заказ #${order.id}</b>\n`;
+                        message += `💰 Сумма: <b>${formatPrice(order.total)}</b>\n\n`;
+                        
+                        // Информация о доставке
+                        if (order.delivery_data) {
+                            const delivery = order.delivery_data;
+                            message += `👤 <b>Данные получателя:</b>\n`;
+                            message += `ФИО: ${delivery.fio || 'Не указано'}\n`;
+                            message += `Телефон: ${delivery.phone || 'Не указано'}\n`;
+                            if (delivery.email) {
+                                message += `Email: ${delivery.email}\n`;
+                            }
+                            message += `\n📍 <b>Адрес доставки:</b>\n`;
+                            message += `Город: ${delivery.city || 'Не указано'}\n`;
+                            message += `Адрес: ${delivery.address || 'Не указано'}\n`;
+                            if (delivery.postal) {
+                                message += `Индекс: ${delivery.postal}\n`;
+                            }
+                            message += `\n`;
+                        }
+                        
+                        // Товары в заказе
+                        if (order.items && order.items.length > 0) {
+                            message += `🛍️ <b>Товары:</b>\n`;
+                            order.items.forEach((item, index) => {
+                                message += `${index + 1}. ${item.name} x${item.quantity} - ${formatPrice(item.price * item.quantity)}\n`;
+                            });
+                            message += `\n`;
+                        }
+                        
+                        // Информация о пользователе Telegram
+                        if (order.user_first_name || order.user_last_name || order.user_username) {
+                            message += `👤 <b>Пользователь Telegram:</b>\n`;
+                            if (order.user_first_name || order.user_last_name) {
+                                message += `Имя: ${order.user_first_name || ''} ${order.user_last_name || ''}\n`;
+                            }
+                            if (order.user_username) {
+                                message += `Username: @${order.user_username}\n`;
+                            }
+                            if (order.user_id) {
+                                message += `ID: ${order.user_id}\n`;
+                            }
+                        }
+                        
+                        message += `\n⏰ Дата: ${new Date(order.created_at).toLocaleString('ru-RU')}\n`;
+                        message += `💳 ID платежа: ${result.paymentId}`;
+                        
+                        await sendTelegramMessage(ADMIN_CHAT_ID, message);
+                    }
+                } catch (orderError) {
+                    console.error('Ошибка получения данных заказа для уведомления:', orderError);
+                    // Отправляем базовое уведомление в случае ошибки
+                    await sendTelegramMessage(
+                        ADMIN_CHAT_ID,
+                        `✅ <b>ЗАКАЗ ОПЛАЧЕН</b>\n\nЗаказ: #${result.orderId}\nСумма: ${formatPrice(result.amount / 100)}\nПлатеж: ${result.paymentId}`
+                    );
+                }
+            }
+        } else if (result.status === 'REJECTED' || result.status === 'CANCELED') {
+            // Отправляем уведомление об отклонении
+            if (ADMIN_CHAT_ID) {
+                await sendTelegramMessage(
+                    ADMIN_CHAT_ID,
+                    `❌ <b>ПЛАТЕЖ ОТКЛОНЕН</b>\n\nЗаказ: #${result.orderId}\nСтатус: ${result.status}\nСумма: ${formatPrice(result.amount / 100)}`
+                );
+            }
         }
 
         // Т-Банк требует ответ "OK" заглавными буквами

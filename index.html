@@ -116,30 +116,84 @@
                 <button class="payment-modal-close" id="payment-form-close">×</button>
             </div>
             <div class="payment-modal-body">
-                <p class="payment-form-info">Укажите контактные данные для получения чека и уведомлений о заказе</p>
+                <p class="payment-form-info">Укажите контактные данные и адрес доставки</p>
                 <form id="payment-form">
-                    <div class="form-field">
-                        <label for="payment-email">Email <span class="field-optional">(необязательно)</span></label>
-                        <input 
-                            type="email" 
-                            id="payment-email" 
-                            name="email" 
-                            placeholder="example@mail.ru"
-                            autocomplete="email"
-                        >
-                        <small class="field-hint">Для отправки чека на email</small>
+                    <div class="form-section">
+                        <h3 class="form-section-title">Контактные данные</h3>
+                        <div class="form-field">
+                            <label for="payment-fio">ФИО <span class="field-required">*</span></label>
+                            <input 
+                                type="text" 
+                                id="payment-fio" 
+                                name="fio" 
+                                placeholder="Иванов Иван Иванович"
+                                autocomplete="name"
+                                required
+                            >
+                            <small class="field-hint">Полное имя получателя</small>
+                        </div>
+                        <div class="form-field">
+                            <label for="payment-phone">Телефон <span class="field-required">*</span></label>
+                            <input 
+                                type="tel" 
+                                id="payment-phone" 
+                                name="phone" 
+                                placeholder="+7 (999) 123-45-67"
+                                autocomplete="tel"
+                                required
+                            >
+                            <small class="field-hint">Для связи и отправки чека</small>
+                        </div>
+                        <div class="form-field">
+                            <label for="payment-email">Email <span class="field-optional">(необязательно)</span></label>
+                            <input 
+                                type="email" 
+                                id="payment-email" 
+                                name="email" 
+                                placeholder="example@mail.ru"
+                                autocomplete="email"
+                            >
+                            <small class="field-hint">Для отправки чека на email</small>
+                        </div>
                     </div>
-                    <div class="form-field">
-                        <label for="payment-phone">Телефон <span class="field-optional">(необязательно)</span></label>
-                        <input 
-                            type="tel" 
-                            id="payment-phone" 
-                            name="phone" 
-                            placeholder="+7 (999) 123-45-67"
-                            autocomplete="tel"
-                        >
-                        <small class="field-hint">Для отправки чека на телефон</small>
+                    
+                    <div class="form-section">
+                        <h3 class="form-section-title">Адрес доставки</h3>
+                        <div class="form-field">
+                            <label for="payment-city">Город <span class="field-required">*</span></label>
+                            <input 
+                                type="text" 
+                                id="payment-city" 
+                                name="city" 
+                                placeholder="Москва"
+                                autocomplete="address-level2"
+                                required
+                            >
+                        </div>
+                        <div class="form-field">
+                            <label for="payment-address">Адрес <span class="field-required">*</span></label>
+                            <textarea 
+                                id="payment-address" 
+                                name="address" 
+                                placeholder="ул. Примерная, д. 1, кв. 10"
+                                rows="3"
+                                required
+                            ></textarea>
+                            <small class="field-hint">Улица, дом, квартира</small>
+                        </div>
+                        <div class="form-field">
+                            <label for="payment-postal">Почтовый индекс <span class="field-optional">(необязательно)</span></label>
+                            <input 
+                                type="text" 
+                                id="payment-postal" 
+                                name="postal" 
+                                placeholder="123456"
+                                pattern="[0-9]{6}"
+                                maxlength="6"
+                            >
+                        </div>
                     </div>
+                    
                     <div class="form-field-required">
                         <p>⚠️ Для формирования чека необходимо указать хотя бы Email или Телефон</p>
                     </div>

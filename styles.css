@@ -1276,7 +1276,34 @@ html {
     font-size: 12px;
 }
 
-.form-field input {
+.form-section {
+    margin-bottom: 28px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.form-section:last-of-type {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.form-section-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--accent-yellow);
+}
+
+.field-required {
+    color: #ff4444;
+    font-weight: 700;
+}
+
+.form-field input,
+.form-field textarea {
     width: 100%;
     padding: 14px 16px;
     border: 2px solid var(--border-color);
@@ -1286,16 +1313,24 @@ html {
     color: var(--text-primary);
     transition: all 0.2s;
     box-sizing: border-box;
+    font-family: inherit;
 }
 
-.form-field input:focus {
+.form-field textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.form-field input:focus,
+.form-field textarea:focus {
     outline: none;
     border-color: var(--accent-yellow);
     box-shadow: 0 0 0 3px rgba(255, 237, 0, 0.15);
     transform: translateY(-1px);
 }
 
-.form-field input::placeholder {
+.form-field input::placeholder,
+.form-field textarea::placeholder {
     color: var(--text-secondary);
     opacity: 0.6;
 }

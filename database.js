@@ -49,6 +49,7 @@ async function initDatabase() {
                 user_username TEXT,
                 items TEXT NOT NULL, -- JSON массив товаров
                 total REAL NOT NULL,
+                delivery_data TEXT, -- JSON с данными доставки (fio, email, phone, city, address, postal)
                 status TEXT DEFAULT 'pending', -- pending, confirmed, completed, cancelled
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -233,19 +234,21 @@ async function deleteProduct(id) {
 async function createOrder(orderData) {
     const db = await getDatabase();
     return new Promise((resolve, reject) => {
-        const { userInfo, items, total } = orderData;
+        const { userInfo, items, total, delivery } = orderData;
         const itemsJson = JSON.stringify(items);
+        const deliveryJson = delivery ? JSON.stringify(delivery) : null;
         
         db.run(
-            `INSERT INTO orders (user_id, user_first_name, user_last_name, user_username, items, total)
-             VALUES (?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO orders (user_id, user_first_name, user_last_name, user_username, items, total, delivery_data)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [
                 userInfo?.id || null,
                 userInfo?.first_name || null,
                 userInfo?.last_name || null,
                 userInfo?.username || null,
                 itemsJson,
-                total
+                total,
+                deliveryJson
             ],
             function(err) {
                 if (err) {
@@ -268,9 +271,31 @@ async function getAllOrders() {
             }
             const orders = rows.map(row => ({
                 ...row,
-                items: JSON.parse(row.items)
+                items: JSON.parse(row.items),
+                delivery_data: row.delivery_data ? JSON.parse(row.delivery_data) : null
             }));
             resolve(orders);
+        });
+    });
+}
+
+async function getOrderById(orderId) {
+    const db = await getDatabase();
+    return new Promise((resolve, reject) => {
+        db.get('SELECT * FROM orders WHERE id = ?', [orderId], (err, row) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            if (!row) {
+                resolve(null);
+                return;
+            }
+            resolve({
+                ...row,
+                items: JSON.parse(row.items),
+                delivery_data: row.delivery_data ? JSON.parse(row.delivery_data) : null
+            });
         });
     });
 }
@@ -502,6 +527,7 @@ module.exports = {
     deleteProduct,
     createOrder,
     getAllOrders,
+    getOrderById,
     createPayment,
     updatePaymentStatus,
     getPaymentByPaymentId,
