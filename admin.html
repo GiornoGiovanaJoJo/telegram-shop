@@ -76,14 +76,13 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="product-image">Изображение товара</label>
-                    <input type="file" id="product-image-file" accept="image/*" style="margin-bottom: 10px;">
-                    <div id="image-preview-container" style="margin-bottom: 10px; display: none;">
-                        <img id="image-preview" src="" alt="Предпросмотр" style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 1px solid var(--border-color);">
-                        <button type="button" id="remove-image-btn" style="margin-left: 10px; padding: 5px 10px; background: var(--error-color); color: white; border: none; border-radius: 4px; cursor: pointer;">Удалить фото</button>
+                    <label for="product-images">Изображения товара (можно выбрать несколько)</label>
+                    <input type="file" id="product-images-file" accept="image/*" multiple style="margin-bottom: 10px;">
+                    <div id="images-preview-container" style="margin-bottom: 10px; display: none;">
+                        <div id="images-preview-list" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;"></div>
                     </div>
-                    <input type="hidden" id="product-image" placeholder="Текущее изображение">
-                    <small style="color: var(--text-secondary); display: block; margin-top: 5px;">Выберите изображение для загрузки или оставьте текущее</small>
+                    <input type="hidden" id="product-images" placeholder="Текущие изображения">
+                    <small style="color: var(--text-secondary); display: block; margin-top: 5px;">Выберите одно или несколько изображений для загрузки</small>
                 </div>
 
                 <div class="form-group">
