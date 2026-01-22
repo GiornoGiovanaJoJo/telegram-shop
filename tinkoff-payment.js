@@ -24,12 +24,29 @@ let tbank = null;
 function getTbankClient() {
     if (!tbank) {
         if (!TINKOFF_TERMINAL_KEY || !TINKOFF_PASSWORD) {
-            throw new Error('Т-Банк не настроен. Проверьте TINKOFF_TERMINAL_KEY и TINKOFF_PASSWORD в config.js');
+            console.error('ОШИБКА: TINKOFF_TERMINAL_KEY или TINKOFF_PASSWORD не установлены');
+            console.error('TerminalKey:', TINKOFF_TERMINAL_KEY ? 'установлен' : 'НЕ установлен');
+            console.error('Password:', TINKOFF_PASSWORD ? 'установлен' : 'НЕ установлен');
+            throw new Error('Т-Банк не настроен. Проверьте TINKOFF_TERMINAL_KEY и TINKOFF_PASSWORD в config.js или переменных окружения');
         }
         
         if (TINKOFF_TERMINAL_KEY.trim() === '' || TINKOFF_PASSWORD.trim() === '') {
+            console.error('ОШИБКА: TINKOFF_TERMINAL_KEY или TINKOFF_PASSWORD пустые');
             throw new Error('Т-Банк не настроен. TINKOFF_TERMINAL_KEY и TINKOFF_PASSWORD не могут быть пустыми');
         }
+        
+        // Логируем первые и последние символы для проверки (без полного раскрытия)
+        const terminalKeyPreview = TINKOFF_TERMINAL_KEY.length > 4 
+            ? `${TINKOFF_TERMINAL_KEY.substring(0, 4)}...${TINKOFF_TERMINAL_KEY.substring(TINKOFF_TERMINAL_KEY.length - 4)}`
+            : '***';
+        const passwordPreview = TINKOFF_PASSWORD.length > 4
+            ? `${TINKOFF_PASSWORD.substring(0, 2)}...${TINKOFF_PASSWORD.substring(TINKOFF_PASSWORD.length - 2)}`
+            : '***';
+        
+        console.log('Инициализация Т-Банк клиента:');
+        console.log('TerminalKey (preview):', terminalKeyPreview, `(длина: ${TINKOFF_TERMINAL_KEY.length})`);
+        console.log('Password (preview):', passwordPreview, `(длина: ${TINKOFF_PASSWORD.length})`);
+        console.log('API URL:', TINKOFF_API_URL);
         
         tbank = new TbankPayments({
             merchantId: TINKOFF_TERMINAL_KEY,
@@ -101,10 +118,15 @@ async function createPayment(paymentData) {
             }
         }
         
+        // Всегда логируем для диагностики проблем с токеном
+        console.log('=== ОТЛАДКА: Запрос к Т-Банк ===');
+        const terminalKeyPreview = TINKOFF_TERMINAL_KEY.length > 4 
+            ? `${TINKOFF_TERMINAL_KEY.substring(0, 4)}...${TINKOFF_TERMINAL_KEY.substring(TINKOFF_TERMINAL_KEY.length - 4)}`
+            : '***';
+        console.log('TerminalKey (preview):', terminalKeyPreview, `(полная длина: ${TINKOFF_TERMINAL_KEY.length})`);
+        console.log('Password установлен:', !!TINKOFF_PASSWORD, `(длина: ${TINKOFF_PASSWORD ? TINKOFF_PASSWORD.length : 0})`);
+        console.log('API URL:', TINKOFF_API_URL);
         if (DEBUG_MODE) {
-            console.log('=== ОТЛАДКА: Запрос к Т-Банк ===');
-            console.log('TerminalKey:', TINKOFF_TERMINAL_KEY);
-            console.log('Password установлен:', !!TINKOFF_PASSWORD);
             console.log('Параметры платежа:', JSON.stringify(paymentParams, null, 2));
         }
         
