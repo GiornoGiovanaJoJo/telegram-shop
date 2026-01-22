@@ -3,6 +3,7 @@ const express = require('express');
 const axios = require('axios');
 const path = require('path');
 const multer = require('multer');
+const db = require('./database');
 
 // Поддержка переменных окружения для хостинга
 let config;
@@ -19,6 +20,11 @@ const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || config.ADMIN_CHAT_ID;
 const app = express();
 const PORT = process.env.PORT || 3000;
 const fs = require('fs').promises;
+
+// Инициализация БД при запуске
+db.migrateFromJSON().catch(err => {
+    console.error('Ошибка миграции данных:', err);
+});
 
 // Настройка multer для загрузки файлов
 const uploadsDir = path.join(__dirname, 'фото');
@@ -159,6 +165,13 @@ app.post('/api/order', async (req, res) => {
         // Формируем сообщение о заказе
         const orderMessage = formatOrderMessage(orderData, userInfo);
         
+        // Сохраняем заказ в БД
+        const orderId = await db.createOrder({
+            userInfo: userInfo,
+            items: orderData.items,
+            total: orderData.total
+        });
+        
         // Отправляем заказ администратору (если указан)
         if (ADMIN_CHAT_ID) {
             await sendTelegramMessage(ADMIN_CHAT_ID, orderMessage);
@@ -179,7 +192,8 @@ app.post('/api/order', async (req, res) => {
         
         res.json({ 
             success: true, 
-            message: 'Заказ успешно оформлен!' 
+            message: 'Заказ успешно оформлен!',
+            orderId: orderId
         });
         
     } catch (error) {
@@ -198,7 +212,7 @@ app.post('/api/order', async (req, res) => {
 // Получить все товары
 app.get('/api/products', async (req, res) => {
     try {
-        const products = await loadProducts();
+        const products = await db.getAllProducts();
         res.json(products);
     } catch (error) {
         console.error('Ошибка получения товаров:', error);
@@ -209,8 +223,7 @@ app.get('/api/products', async (req, res) => {
 // Получить товар по ID
 app.get('/api/products/:id', async (req, res) => {
     try {
-        const products = await loadProducts();
-        const product = products.find(p => p.id === parseInt(req.params.id));
+        const product = await db.getProductById(parseInt(req.params.id));
         
         if (!product) {
             return res.status(404).json({ error: 'Товар не найден' });
@@ -223,8 +236,23 @@ app.get('/api/products/:id', async (req, res) => {
     }
 });
 
+// Middleware для обработки ошибок multer
+function handleMulterError(err, req, res, next) {
+    if (err) {
+        if (err instanceof multer.MulterError) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(400).json({ error: 'Размер файла превышает 10MB' });
+            }
+            return res.status(400).json({ error: 'Ошибка загрузки файла: ' + err.message });
+        }
+        // Обработка других ошибок (например, неподдерживаемый тип файла)
+        return res.status(400).json({ error: err.message || 'Ошибка загрузки файла' });
+    }
+    next();
+}
+
 // Endpoint для загрузки изображения товара
-app.post('/api/upload', upload.single('image'), (req, res) => {
+app.post('/api/upload', upload.single('image'), handleMulterError, (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'Файл не был загружен' });
@@ -243,15 +271,25 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
     }
 });
 
-// Создать новый товар (с поддержкой загрузки файла)
-app.post('/api/products', upload.single('image'), async (req, res) => {
+// Создать новый товар (с поддержкой загрузки нескольких файлов)
+app.post('/api/products', upload.array('images', 10), handleMulterError, async (req, res) => {
     try {
         const products = await loadProducts();
         
-        // Если загружен файл, используем его путь
-        let imagePath = req.body.image || '';
-        if (req.file) {
-            imagePath = `фото/${req.file.filename}`;
+        // Обработка загруженных файлов
+        let images = [];
+        if (req.files && req.files.length > 0) {
+            images = req.files.map(file => `фото/${file.filename}`);
+        }
+        
+        // Добавляем существующие изображения, если они есть
+        if (req.body.existingImages) {
+            try {
+                const existingImages = JSON.parse(req.body.existingImages);
+                images = [...existingImages, ...images];
+            } catch (e) {
+                console.error('Ошибка парсинга existingImages:', e);
+            }
         }
         
         // Обработка тегов (может быть строкой или массивом)
@@ -268,54 +306,56 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
             }
         }
         
-        const newProduct = {
-            id: products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1,
+        const productId = await db.createProduct({
             name: req.body.name,
             price: parseFloat(req.body.price),
             category: req.body.category,
             description: req.body.description || '',
-            image: imagePath,
+            images: images,
             emoji: req.body.emoji || '📦',
-            // ДОБАВЬТЕ ЗДЕСЬ: сохранение ваших новых полей
             tags: tags,
             sku: req.body.sku || '',
             inStock: req.body.inStock !== undefined ? (req.body.inStock === 'true' || req.body.inStock === true) : true,
             rating: req.body.rating ? parseFloat(req.body.rating) : null
-        };
+        });
         
-        products.push(newProduct);
-        await saveProducts(products);
-        
+        const newProduct = await db.getProductById(productId);
         res.status(201).json(newProduct);
     } catch (error) {
         console.error('Ошибка создания товара:', error);
-        res.status(500).json({ error: 'Ошибка создания товара' });
+        res.status(500).json({ error: 'Ошибка создания товара: ' + error.message });
     }
 });
 
-// Обновить товар (с поддержкой загрузки файла)
-app.put('/api/products/:id', upload.single('image'), async (req, res) => {
+// Обновить товар (с поддержкой загрузки нескольких файлов)
+app.put('/api/products/:id', upload.array('images', 10), handleMulterError, async (req, res) => {
     try {
-        const products = await loadProducts();
-        const index = products.findIndex(p => p.id === parseInt(req.params.id));
+        const existingProduct = await db.getProductById(parseInt(req.params.id));
         
-        if (index === -1) {
+        if (!existingProduct) {
             return res.status(404).json({ error: 'Товар не найден' });
         }
         
-        // Если загружен новый файл, используем его путь
-        let imagePath = req.body.image || products[index].image;
-        if (req.file) {
-            imagePath = `фото/${req.file.filename}`;
-            // Опционально: удаляем старое изображение, если оно было загружено ранее
-            if (products[index].image && products[index].image.startsWith('фото/')) {
-                const oldImagePath = path.join(__dirname, products[index].image);
-                fs.unlink(oldImagePath).catch(() => {}); // Игнорируем ошибки удаления
+        // Получаем текущие изображения
+        let currentImages = existingProduct.images || [];
+        
+        // Добавляем существующие изображения, если они переданы
+        if (req.body.existingImages) {
+            try {
+                currentImages = JSON.parse(req.body.existingImages);
+            } catch (e) {
+                console.error('Ошибка парсинга existingImages:', e);
             }
         }
         
+        // Добавляем новые загруженные файлы
+        if (req.files && req.files.length > 0) {
+            const newImages = req.files.map(file => `фото/${file.filename}`);
+            currentImages = [...currentImages, ...newImages];
+        }
+        
         // Обработка тегов (может быть строкой или массивом)
-        let tags = products[index].tags || [];
+        let tags = existingProduct.tags || [];
         if (req.body.tags !== undefined) {
             if (typeof req.body.tags === 'string') {
                 try {
@@ -328,48 +368,51 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
             }
         }
         
-        products[index] = {
-            ...products[index],
+        await db.updateProduct(parseInt(req.params.id), {
             name: req.body.name,
             price: parseFloat(req.body.price),
             category: req.body.category,
             description: req.body.description || '',
-            image: imagePath,
-            emoji: req.body.emoji || products[index].emoji,
-            // ДОБАВЬТЕ ЗДЕСЬ: обновление ваших новых полей
+            images: currentImages,
+            emoji: req.body.emoji || existingProduct.emoji,
             tags: tags,
-            sku: req.body.sku !== undefined ? req.body.sku : products[index].sku || '',
-            inStock: req.body.inStock !== undefined ? (req.body.inStock === 'true' || req.body.inStock === true) : products[index].inStock !== false,
-            rating: req.body.rating ? parseFloat(req.body.rating) : (products[index].rating || null)
-        };
+            sku: req.body.sku !== undefined ? req.body.sku : existingProduct.sku || '',
+            inStock: req.body.inStock !== undefined ? (req.body.inStock === 'true' || req.body.inStock === true) : existingProduct.inStock !== false,
+            rating: req.body.rating ? parseFloat(req.body.rating) : (existingProduct.rating || null)
+        });
         
-        await saveProducts(products);
-        res.json(products[index]);
+        const updatedProduct = await db.getProductById(parseInt(req.params.id));
+        res.json(updatedProduct);
     } catch (error) {
         console.error('Ошибка обновления товара:', error);
-        res.status(500).json({ error: 'Ошибка обновления товара' });
+        res.status(500).json({ error: 'Ошибка обновления товара: ' + error.message });
     }
 });
 
 // Удалить товар
 app.delete('/api/products/:id', async (req, res) => {
     try {
-        const products = await loadProducts();
-        const productToDelete = products.find(p => p.id === parseInt(req.params.id));
+        const productToDelete = await db.getProductById(parseInt(req.params.id));
         
         if (!productToDelete) {
             return res.status(404).json({ error: 'Товар не найден' });
         }
         
-        // Удаляем изображение товара, если оно было загружено
-        if (productToDelete.image && productToDelete.image.startsWith('фото/')) {
-            const imagePath = path.join(__dirname, productToDelete.image);
-            fs.unlink(imagePath).catch(() => {}); // Игнорируем ошибки удаления
+        // Удаляем изображения товара, если они были загружены
+        const imagesToDelete = productToDelete.images || [];
+        for (const imagePath of imagesToDelete) {
+            if (imagePath && imagePath.startsWith('фото/')) {
+                const fullPath = path.join(__dirname, imagePath);
+                fs.unlink(fullPath).catch(() => {}); // Игнорируем ошибки удаления
+            }
         }
         
-        const filteredProducts = products.filter(p => p.id !== parseInt(req.params.id));
-        await saveProducts(filteredProducts);
-        res.json({ success: true, message: 'Товар удален' });
+        const deleted = await db.deleteProduct(parseInt(req.params.id));
+        if (deleted) {
+            res.json({ success: true, message: 'Товар удален' });
+        } else {
+            res.status(404).json({ error: 'Товар не найден' });
+        }
     } catch (error) {
         console.error('Ошибка удаления товара:', error);
         res.status(500).json({ error: 'Ошибка удаления товара' });
@@ -405,6 +448,21 @@ app.get('/api/payment/status/:id', async (req, res) => {
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ============================================
+// Обработка ошибок для API маршрутов
+// ============================================
+
+// Общий обработчик ошибок для API
+app.use('/api', (err, req, res, next) => {
+    console.error('Ошибка API:', err);
+    if (res.headersSent) {
+        return next(err);
+    }
+    res.status(err.status || 500).json({ 
+        error: err.message || 'Внутренняя ошибка сервера' 
+    });
 });
 
 // ============================================
