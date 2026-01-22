@@ -60,7 +60,7 @@ async function createPayment(paymentData) {
             Description: description || `Заказ #${orderId}`,
             SuccessURL: successUrl,
             FailURL: failureUrl,
-            NotificationURL: `${process.env.BASE_URL || config.BASE_URL || 'http://localhost:3000'}/api/payment/webhook`,
+            NotificationURL: `${process.env.BASE_URL || config.BASE_URL || 'https://telegram-shop-production.up.railway.app'}/api/payment/webhook`,
             CustomerKey: customer?.id?.toString() || orderId.toString()
         };
         
