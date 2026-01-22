@@ -492,19 +492,28 @@ async function handleCheckout(email = '', phone = '') {
                 const paymentResult = await paymentResponse.json();
 
                 if (paymentResult.success && paymentResult.paymentUrl) {
-                    // Перенаправляем на страницу оплаты
-                    tg.openLink(paymentResult.paymentUrl);
+                    console.log('Платеж создан успешно, перенаправляем на:', paymentResult.paymentUrl);
                     
-                    tg.showAlert('✅ Заказ создан! Переходим к оплате...', () => {
-                        // Очистить корзину после создания заказа
-                        state.cart = [];
-                        saveCart();
-                        updateCartBadge();
-                        renderCart();
-                        showPage('main');
-                    });
+                    // Очищаем корзину перед перенаправлением
+                    state.cart = [];
+                    saveCart();
+                    updateCartBadge();
+                    renderCart();
+                    
+                    // Перенаправляем на страницу оплаты
+                    // Используем tg.openLink для Telegram Mini App, иначе window.location
+                    if (window.Telegram && window.Telegram.WebApp && tg.openLink) {
+                        // В Telegram Mini App используем специальный метод
+                        console.log('Используем tg.openLink для перенаправления');
+                        tg.openLink(paymentResult.paymentUrl);
+                    } else {
+                        // В обычном браузере используем стандартное перенаправление
+                        console.log('Используем window.location.href для перенаправления');
+                        window.location.href = paymentResult.paymentUrl;
+                    }
                 } else {
                     // Если платеж не создан, используем резервный вариант
+                    console.error('Ошибка создания платежа:', paymentResult);
                     throw new Error(paymentResult.error || 'Не удалось создать платеж');
                 }
             } catch (paymentError) {
