@@ -57,7 +57,7 @@ const elements = {
     cartBadge: document.getElementById('cart-badge'),
     cartIcon: document.getElementById('cart-icon'),
     searchInput: document.getElementById('search-input'),
-    categoryBtns: document.querySelectorAll('.category-btn'),
+    categorySelect: document.getElementById('category-select'),
     backBtn: document.getElementById('back-btn'),
     cartBackBtn: document.getElementById('cart-back-btn'),
     emptyCart: document.getElementById('empty-cart'),
@@ -82,14 +82,13 @@ function setupEventListeners() {
     });
 
     // Категории
-    elements.categoryBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            elements.categoryBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            state.currentCategory = btn.dataset.category;
-            renderProducts();
-        });
+    elements.categorySelect.addEventListener('change', (e) => {
+        state.currentCategory = e.target.value;
+        renderProducts();
     });
+    
+    // Устанавливаем начальное значение
+    elements.categorySelect.value = state.currentCategory;
 
     // Корзина
     elements.cartIcon.addEventListener('click', () => {

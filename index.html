@@ -51,12 +51,18 @@
         </div>
         
         <div class="categories">
-            <button class="category-btn active" data-category="all">Все</button>
-            <button class="category-btn" data-category="electronics">Электроника</button>
-            <button class="category-btn" data-category="clothing">Одежда</button>
-            <button class="category-btn" data-category="books">Книги</button>
-            <button class="category-btn" data-category="backpack">Рюкзак</button>
-            <button class="category-btn" data-category="other">Другое</button>
+            <label class="category-label">Категория:</label>
+            <div class="category-dropdown-wrapper">
+                <select id="category-select" class="category-select">
+                    <option value="all">Все</option>
+                    <option value="electronics">Электроника</option>
+                    <option value="clothing">Одежда</option>
+                    <option value="books">Книги</option>
+                    <option value="backpack">Рюкзак</option>
+                    <option value="other">Другое</option>
+                </select>
+                <span class="category-dropdown-arrow">▼</span>
+            </div>
         </div>
         
         <div class="products-grid" id="products-grid">
