@@ -132,6 +132,8 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 20px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .admin-product-card {
@@ -140,6 +142,11 @@
     border-radius: 16px;
     padding: 16px;
     transition: all 0.3s;
+    overflow: hidden;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .admin-product-card:hover {
@@ -157,11 +164,39 @@
     background: var(--border-color);
 }
 
+.admin-product-info {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+}
+
 .admin-product-info h3 {
     font-size: 18px;
     font-weight: 700;
     color: var(--primary-dark);
     margin-bottom: 8px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.admin-product-info p {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    max-width: 100%;
+    white-space: normal;
+    overflow: hidden;
+}
+
+.admin-product-info div {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+}
+
+.admin-product-info strong {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .admin-product-price {
