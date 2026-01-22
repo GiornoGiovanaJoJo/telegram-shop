@@ -22,6 +22,7 @@ const DEBUG_MODE = process.env.NODE_ENV === 'development' || process.env.DEBUG =
 /**
  * Рекурсивное преобразование объекта в строку для подписи
  * Согласно документации Т-Банк, вложенные объекты должны быть преобразованы в JSON
+ * БЕЗ пробелов и с сортировкой ключей
  */
 function valueToString(value) {
     if (value === null || value === undefined) {
@@ -33,19 +34,31 @@ function valueToString(value) {
         return value ? 'true' : 'false';
     }
     
-    // Массивы преобразуем в JSON
+    // Массивы преобразуем в JSON без пробелов
     if (Array.isArray(value)) {
         return JSON.stringify(value);
     }
     
-    // Объекты преобразуем в JSON с сортировкой ключей
+    // Объекты преобразуем в JSON с сортировкой ключей и БЕЗ пробелов
     if (typeof value === 'object') {
-        // Сортируем ключи объекта
-        const sortedKeys = Object.keys(value).sort();
+        // Рекурсивно сортируем вложенные объекты
         const sortedObj = {};
+        const sortedKeys = Object.keys(value).sort();
         for (const key of sortedKeys) {
-            sortedObj[key] = value[key];
+            const val = value[key];
+            if (val !== null && val !== undefined) {
+                if (typeof val === 'object' && !Array.isArray(val)) {
+                    // Рекурсивно обрабатываем вложенные объекты
+                    sortedObj[key] = JSON.parse(valueToString(val));
+                } else if (Array.isArray(val)) {
+                    // Массивы обрабатываем как есть
+                    sortedObj[key] = val;
+                } else {
+                    sortedObj[key] = val;
+                }
+            }
         }
+        // JSON.stringify без пробелов
         return JSON.stringify(sortedObj);
     }
     
@@ -156,16 +169,26 @@ async function createPayment(paymentData) {
         // Формируем чек для 54-ФЗ, если есть товары
         // ВАЖНО: Т-Банк требует Email или Phone при передаче чека
         if (items && items.length > 0 && (customerEmail || customerPhone)) {
-            requestData.Receipt = {
-                Taxation: 'usn_income',
-                Items: items.map(item => ({
+            // Формируем Items массив
+            const receiptItems = items.map(item => {
+                const receiptItem = {
                     Name: item.Name || item.name,
                     Price: item.Price || Math.round((item.price || 0) * 100),
                     Quantity: item.Quantity || item.quantity || 1,
                     Amount: item.Amount || Math.round((item.price || 0) * (item.quantity || 1) * 100),
-                    Tax: item.Tax || 'none',
-                    Ean13: item.Ean13 || item.sku || ''
-                }))
+                    Tax: item.Tax || 'none'
+                };
+                // Добавляем Ean13 только если он есть
+                if (item.Ean13 || item.sku) {
+                    receiptItem.Ean13 = item.Ean13 || item.sku;
+                }
+                return receiptItem;
+            });
+            
+            // Формируем объект Receipt
+            requestData.Receipt = {
+                Taxation: 'usn_income',
+                Items: receiptItems
             };
             
             // Добавляем Email или Phone в чек (хотя бы одно обязательно)
