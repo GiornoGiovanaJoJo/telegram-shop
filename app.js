@@ -41,7 +41,9 @@ let state = {
     currentCategory: 'all',
     searchQuery: '',
     currentProduct: null,
-    currentQuantity: 1
+    currentQuantity: 1,
+    productImages: [],
+    currentImageIndex: 0
 };
 
 // Элементы DOM
@@ -110,16 +112,22 @@ function renderProducts() {
         return matchesCategory && matchesSearch;
     });
 
-    elements.productsGrid.innerHTML = filtered.map(product => `
+    elements.productsGrid.innerHTML = filtered.map(product => {
+        // Получаем первое изображение (поддержка старого формата)
+        const productImages = product.images || (product.image ? [product.image] : []);
+        const firstImage = productImages[0] || '';
+        
+        return `
         <div class="product-card" onclick="showProduct(${product.id})">
-            <img src="${product.image || ''}" alt="${product.name}" class="product-image" onerror="this.style.display='none'; this.parentElement.querySelector('.product-image-fallback').style.display='flex';">
-            <div class="product-image-fallback" style="display: ${product.image ? 'none' : 'flex'}; width: 100%; height: 180px; align-items: center; justify-content: center; font-size: 48px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);">${product.emoji}</div>
+            <img src="${firstImage}" alt="${product.name}" class="product-image" onerror="this.style.display='none'; this.parentElement.querySelector('.product-image-fallback').style.display='flex';">
+            <div class="product-image-fallback" style="display: ${firstImage ? 'none' : 'flex'}; width: 100%; height: 180px; align-items: center; justify-content: center; font-size: 48px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);">${product.emoji}</div>
             <div class="product-info">
                 <div class="product-name">${product.name}</div>
                 <div class="product-price">${formatPrice(product.price)}</div>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // Показать страницу товара
@@ -132,9 +140,47 @@ function showProduct(productId) {
 
     const quantityInCart = getCartItemQuantity(productId);
 
+    // Получаем массив изображений (поддержка старого формата)
+    const productImages = product.images || (product.image ? [product.image] : []);
+    const currentImageIndex = 0;
+    
+    // Создаем галерею изображений
+    let galleryHTML = '';
+    if (productImages.length > 0) {
+        galleryHTML = `
+            <div class="product-gallery" style="position: relative; margin-bottom: 20px;">
+                <div class="product-gallery-main" style="width: 100%; height: 320px; position: relative; border-radius: 20px; overflow: hidden; box-shadow: var(--shadow-lg);">
+                    <img id="product-main-image" src="${productImages[0]}" alt="${product.name}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'; this.parentElement.querySelector('.product-detail-image-fallback').style.display='flex';">
+                    <div class="product-detail-image-fallback" style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 96px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);">${product.emoji}</div>
+                    ${productImages.length > 1 ? `
+                        <button class="gallery-nav-btn gallery-prev" onclick="changeProductImage(-1)" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.9); border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">‹</button>
+                        <button class="gallery-nav-btn gallery-next" onclick="changeProductImage(1)" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.9); border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">›</button>
+                        <div class="gallery-indicator" style="position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); color: white; padding: 5px 15px; border-radius: 20px; font-size: 14px;">
+                            <span id="gallery-current">1</span> / <span id="gallery-total">${productImages.length}</span>
+                        </div>
+                    ` : ''}
+                </div>
+                ${productImages.length > 1 ? `
+                    <div class="product-gallery-thumbnails" style="display: flex; gap: 10px; margin-top: 10px; overflow-x: auto; padding: 5px 0;">
+                        ${productImages.map((img, idx) => `
+                            <img src="${img}" alt="Фото ${idx + 1}" class="gallery-thumbnail" onclick="setProductImage(${idx})" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 2px solid ${idx === 0 ? 'var(--accent-yellow)' : 'transparent'}; opacity: ${idx === 0 ? '1' : '0.7'};">
+                        `).join('')}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    } else {
+        galleryHTML = `
+            <div class="product-detail-image-fallback" style="display: flex; width: 100%; height: 320px; align-items: center; justify-content: center; font-size: 96px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); border-radius: 20px; margin-bottom: 20px; box-shadow: var(--shadow-lg); border: 2px solid var(--border-color);">${product.emoji}</div>
+        `;
+    }
+    
+    // Сохраняем данные галереи в state
+    state.productImages = productImages;
+    state.currentImageIndex = 0;
+    
     elements.productDetails.innerHTML = `
-        <img src="${product.image || ''}" alt="${product.name}" class="product-detail-image" onerror="this.style.display='none'; this.parentElement.querySelector('.product-detail-image-fallback').style.display='flex';">
-        <div class="product-detail-image-fallback" style="display: ${product.image ? 'none' : 'flex'}; width: 100%; height: 320px; align-items: center; justify-content: center; font-size: 96px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); border-radius: 20px; margin-bottom: 20px; box-shadow: var(--shadow-lg); border: 2px solid var(--border-color);">${product.emoji}</div>
+        ${galleryHTML}
         <div class="product-detail-name">${product.name}</div>
         <div class="product-detail-price">${formatPrice(product.price)}</div>
         <div class="product-detail-description">${product.description}</div>
@@ -228,10 +274,15 @@ function renderCart() {
     elements.emptyCart.style.display = 'none';
     elements.cartFooter.style.display = 'block';
 
-    elements.cartItems.innerHTML = state.cart.map(item => `
+    elements.cartItems.innerHTML = state.cart.map(item => {
+        // Получаем первое изображение (поддержка старого формата)
+        const itemImages = item.images || (item.image ? [item.image] : []);
+        const firstImage = itemImages[0] || '';
+        
+        return `
         <div class="cart-item">
-            <img src="${item.image || ''}" alt="${item.name}" class="cart-item-image" onerror="this.style.display='none'; this.parentElement.querySelector('.cart-item-image-fallback').style.display='flex';">
-            <div class="cart-item-image-fallback" style="display: ${item.image ? 'none' : 'flex'}; width: 80px; height: 80px; align-items: center; justify-content: center; font-size: 32px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); border-radius: 8px; flex-shrink: 0;">${item.emoji}</div>
+            <img src="${firstImage}" alt="${item.name}" class="cart-item-image" onerror="this.style.display='none'; this.parentElement.querySelector('.cart-item-image-fallback').style.display='flex';">
+            <div class="cart-item-image-fallback" style="display: ${firstImage ? 'none' : 'flex'}; width: 80px; height: 80px; align-items: center; justify-content: center; font-size: 32px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); border-radius: 8px; flex-shrink: 0;">${item.emoji}</div>
             <div class="cart-item-info">
                 <div class="cart-item-name">${item.name}</div>
                 <div class="cart-item-price">${formatPrice(item.price)}</div>
@@ -245,7 +296,8 @@ function renderCart() {
                 </div>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 
     const total = state.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
     elements.totalPrice.textContent = formatPrice(total);
@@ -373,12 +425,58 @@ function formatPrice(price) {
     }).format(price);
 }
 
+// Функции для галереи изображений
+function changeProductImage(direction) {
+    if (!state.productImages || state.productImages.length <= 1) return;
+    
+    state.currentImageIndex += direction;
+    if (state.currentImageIndex < 0) {
+        state.currentImageIndex = state.productImages.length - 1;
+    } else if (state.currentImageIndex >= state.productImages.length) {
+        state.currentImageIndex = 0;
+    }
+    
+    updateProductImage();
+}
+
+function setProductImage(index) {
+    if (!state.productImages || index < 0 || index >= state.productImages.length) return;
+    state.currentImageIndex = index;
+    updateProductImage();
+}
+
+function updateProductImage() {
+    const mainImage = document.getElementById('product-main-image');
+    const currentIndicator = document.getElementById('gallery-current');
+    const thumbnails = document.querySelectorAll('.gallery-thumbnail');
+    
+    if (mainImage && state.productImages[state.currentImageIndex]) {
+        mainImage.src = state.productImages[state.currentImageIndex];
+    }
+    
+    if (currentIndicator) {
+        currentIndicator.textContent = state.currentImageIndex + 1;
+    }
+    
+    thumbnails.forEach((thumb, idx) => {
+        if (idx === state.currentImageIndex) {
+            thumb.style.borderColor = 'var(--accent-yellow)';
+            thumb.style.opacity = '1';
+        } else {
+            thumb.style.borderColor = 'transparent';
+            thumb.style.opacity = '0.7';
+        }
+    });
+}
+
 // Глобальные функции для onclick
 window.showProduct = showProduct;
 window.changeQuantity = changeQuantity;
 window.addToCart = addToCart;
 window.removeFromCart = removeFromCart;
 window.updateCartQuantity = updateCartQuantity;
+window.changeProductImage = changeProductImage;
+window.setProductImage = setProductImage;
 
 // Запуск приложения
 init();
