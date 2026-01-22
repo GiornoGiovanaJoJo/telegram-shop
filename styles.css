@@ -1174,6 +1174,245 @@ html {
     }
 }
 
+/* Форма платежа */
+.payment-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(31, 27, 32, 0.9);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    backdrop-filter: blur(5px);
+}
+
+.payment-modal.active {
+    display: flex;
+}
+
+.payment-modal-content {
+    background: var(--surface);
+    border-radius: 20px;
+    max-width: 500px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+.payment-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 2px solid var(--border-color);
+    background: var(--primary-dark);
+    border-radius: 20px 20px 0 0;
+}
+
+.payment-modal-header h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent-yellow);
+    margin: 0;
+}
+
+.payment-modal-close {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    color: var(--primary-light);
+    font-weight: bold;
+}
+
+.payment-modal-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+.payment-modal-close:active {
+    transform: scale(0.95);
+}
+
+.payment-modal-body {
+    padding: 24px;
+}
+
+.payment-form-info {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin-bottom: 20px;
+    line-height: 1.6;
+}
+
+.form-field {
+    margin-bottom: 20px;
+}
+
+.form-field label {
+    display: block;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.field-optional {
+    font-weight: 400;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.form-field input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    font-size: 16px;
+    background: var(--surface);
+    color: var(--text-primary);
+    transition: all 0.2s;
+    box-sizing: border-box;
+}
+
+.form-field input:focus {
+    outline: none;
+    border-color: var(--accent-yellow);
+    box-shadow: 0 0 0 3px rgba(255, 237, 0, 0.15);
+    transform: translateY(-1px);
+}
+
+.form-field input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.6;
+}
+
+.field-hint {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 12px;
+    margin-top: 6px;
+    opacity: 0.7;
+}
+
+.form-field-required {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    padding: 12px 16px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    border-left: 4px solid var(--accent-yellow);
+}
+
+.form-field-required p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+.payment-form-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.payment-btn-cancel,
+.payment-btn-submit {
+    flex: 1;
+    padding: 16px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.payment-btn-cancel {
+    background: var(--border-color);
+    color: var(--text-primary);
+}
+
+.payment-btn-cancel:hover {
+    background: #D0D0D0;
+    transform: translateY(-1px);
+}
+
+.payment-btn-cancel:active {
+    transform: translateY(0);
+}
+
+.payment-btn-submit {
+    background: var(--accent-yellow);
+    color: var(--primary-dark);
+    box-shadow: var(--shadow-lg);
+}
+
+.payment-btn-submit:hover {
+    background: #FFD700;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(255, 237, 0, 0.4);
+}
+
+.payment-btn-submit:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow);
+}
+
+.payment-btn-submit:disabled {
+    background: var(--border-color);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@media (max-width: 480px) {
+    .payment-modal-content {
+        max-width: 100%;
+        margin: 10px;
+    }
+    
+    .payment-modal-header {
+        padding: 16px 20px;
+    }
+    
+    .payment-modal-body {
+        padding: 20px;
+    }
+    
+    .payment-form-actions {
+        flex-direction: column;
+    }
+    
+    .payment-btn-cancel,
+    .payment-btn-submit {
+        width: 100%;
+    }
+}
+
 /* Улучшенный фокус для доступности */
 *:focus-visible {
     outline: 2px solid var(--accent-yellow);

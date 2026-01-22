@@ -63,7 +63,14 @@ const elements = {
     emptyCart: document.getElementById('empty-cart'),
     cartFooter: document.getElementById('cart-footer'),
     totalPrice: document.getElementById('total-price'),
-    checkoutBtn: document.getElementById('checkout-btn')
+    checkoutBtn: document.getElementById('checkout-btn'),
+    paymentModal: document.getElementById('payment-form-modal'),
+    paymentForm: document.getElementById('payment-form'),
+    paymentFormClose: document.getElementById('payment-form-close'),
+    paymentFormCancel: document.getElementById('payment-form-cancel'),
+    paymentFormSubmit: document.getElementById('payment-form-submit'),
+    paymentEmail: document.getElementById('payment-email'),
+    paymentPhone: document.getElementById('payment-phone')
 };
 
 // Инициализация
@@ -100,7 +107,26 @@ function setupEventListeners() {
     });
 
     // Кнопка оформления заказа
-    elements.checkoutBtn.addEventListener('click', handleCheckout);
+    elements.checkoutBtn.addEventListener('click', () => {
+        showPaymentForm();
+    });
+    
+    // Закрытие формы платежа
+    elements.paymentFormClose.addEventListener('click', closePaymentForm);
+    elements.paymentFormCancel.addEventListener('click', closePaymentForm);
+    
+    // Отправка формы платежа
+    elements.paymentForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        handlePaymentFormSubmit();
+    });
+    
+    // Закрытие по клику вне формы
+    elements.paymentModal.addEventListener('click', (e) => {
+        if (e.target === elements.paymentModal) {
+            closePaymentForm();
+        }
+    });
 }
 
 // Отображение товаров
@@ -313,8 +339,86 @@ function renderCart() {
     elements.totalPrice.textContent = formatPrice(total);
 }
 
+// Показать форму платежа
+function showPaymentForm() {
+    if (state.cart.length === 0) return;
+    
+    // Получаем информацию о пользователе из Telegram
+    const userInfo = tg.initDataUnsafe?.user || null;
+    
+    // Заполняем форму данными из Telegram, если они есть
+    if (userInfo?.email) {
+        elements.paymentEmail.value = userInfo.email;
+    }
+    if (userInfo?.phone) {
+        elements.paymentPhone.value = userInfo.phone;
+    }
+    
+    // Показываем модальное окно
+    elements.paymentModal.classList.add('active');
+    
+    // Фокус на первое поле
+    if (!elements.paymentEmail.value) {
+        elements.paymentEmail.focus();
+    } else if (!elements.paymentPhone.value) {
+        elements.paymentPhone.focus();
+    }
+}
+
+// Закрыть форму платежа
+function closePaymentForm() {
+    elements.paymentModal.classList.remove('active');
+}
+
+// Обработка отправки формы платежа
+async function handlePaymentFormSubmit() {
+    const email = elements.paymentEmail.value.trim();
+    const phone = elements.paymentPhone.value.trim();
+    
+    // Проверяем, что указан хотя бы email или phone
+    if (!email && !phone) {
+        tg.showAlert('⚠️ Пожалуйста, укажите Email или Телефон для получения чека');
+        return;
+    }
+    
+    // Валидация email, если указан
+    if (email && !isValidEmail(email)) {
+        tg.showAlert('⚠️ Пожалуйста, укажите корректный Email адрес');
+        elements.paymentEmail.focus();
+        return;
+    }
+    
+    // Валидация телефона, если указан
+    if (phone && !isValidPhone(phone)) {
+        tg.showAlert('⚠️ Пожалуйста, укажите корректный номер телефона');
+        elements.paymentPhone.focus();
+        return;
+    }
+    
+    // Закрываем форму
+    closePaymentForm();
+    
+    // Продолжаем оформление заказа с указанными данными
+    await handleCheckout(email, phone);
+}
+
+// Валидация email
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
+
+// Валидация телефона
+function isValidPhone(phone) {
+    // Удаляем все нецифровые символы кроме +
+    const cleaned = phone.replace(/[^\d+]/g, '');
+    // Проверяем, что осталось минимум 10 цифр
+    const digits = cleaned.replace(/\+/g, '');
+    return digits.length >= 10;
+}
+
 // Оформление заказа
-async function handleCheckout() {
+async function handleCheckout(email = '', phone = '') {
     if (state.cart.length === 0) return;
 
     const total = state.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -364,19 +468,12 @@ async function handleCheckout() {
                     : '/api/payment/create';
 
                 // Формируем данные клиента для платежа
-                // Т-Банк требует Email или Phone при передаче чека
+                // Используем данные из формы или из Telegram
                 const customerData = {
                     id: userInfo?.id,
-                    email: userInfo?.email || '',
-                    phone: userInfo?.phone || ''
+                    email: email || userInfo?.email || '',
+                    phone: phone || userInfo?.phone || ''
                 };
-                
-                // Если нет email и phone, пытаемся использовать username как идентификатор
-                if (!customerData.email && !customerData.phone && userInfo?.username) {
-                    // Можно использовать username@telegram.local как временный email
-                    // или просто не передавать чек
-                    console.log('Email и Phone не указаны, чек не будет передан');
-                }
 
                 const paymentResponse = await fetch(paymentApiUrl, {
                     method: 'POST',

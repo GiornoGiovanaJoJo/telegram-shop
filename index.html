@@ -108,6 +108,50 @@
         </div>
     </div>
     
+    <!-- Модальное окно формы платежа -->
+    <div id="payment-form-modal" class="payment-modal">
+        <div class="payment-modal-content">
+            <div class="payment-modal-header">
+                <h2>Данные для оплаты</h2>
+                <button class="payment-modal-close" id="payment-form-close">×</button>
+            </div>
+            <div class="payment-modal-body">
+                <p class="payment-form-info">Укажите контактные данные для получения чека и уведомлений о заказе</p>
+                <form id="payment-form">
+                    <div class="form-field">
+                        <label for="payment-email">Email <span class="field-optional">(необязательно)</span></label>
+                        <input 
+                            type="email" 
+                            id="payment-email" 
+                            name="email" 
+                            placeholder="example@mail.ru"
+                            autocomplete="email"
+                        >
+                        <small class="field-hint">Для отправки чека на email</small>
+                    </div>
+                    <div class="form-field">
+                        <label for="payment-phone">Телефон <span class="field-optional">(необязательно)</span></label>
+                        <input 
+                            type="tel" 
+                            id="payment-phone" 
+                            name="phone" 
+                            placeholder="+7 (999) 123-45-67"
+                            autocomplete="tel"
+                        >
+                        <small class="field-hint">Для отправки чека на телефон</small>
+                    </div>
+                    <div class="form-field-required">
+                        <p>⚠️ Для формирования чека необходимо указать хотя бы Email или Телефон</p>
+                    </div>
+                    <div class="payment-form-actions">
+                        <button type="button" class="payment-btn-cancel" id="payment-form-cancel">Отмена</button>
+                        <button type="submit" class="payment-btn-submit" id="payment-form-submit">Перейти к оплате</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
     <!-- Футер с информацией о компании -->
     <footer class="site-footer">
         <div class="footer-content">
