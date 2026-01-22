@@ -49,6 +49,10 @@ async function createPayment(paymentData) {
         
         const tbankClient = getTbankClient();
         
+        // Получаем данные клиента
+        const customerEmail = customer?.email || '';
+        const customerPhone = customer?.phone || '';
+        
         // Формируем данные для создания платежа
         const paymentParams = {
             Amount: amount, // Сумма уже в копейках
@@ -57,20 +61,11 @@ async function createPayment(paymentData) {
             SuccessURL: successUrl,
             FailURL: failureUrl,
             NotificationURL: `${process.env.BASE_URL || config.BASE_URL || 'http://localhost:3000'}/api/payment/webhook`,
-            Recurrent: 'N',
             CustomerKey: customer?.id?.toString() || orderId.toString()
         };
         
-        // Добавляем данные клиента, если они есть
-        const customerEmail = customer?.email || '';
-        const customerPhone = customer?.phone || '';
-        
-        if (customerEmail) {
-            paymentParams.Email = customerEmail;
-        }
-        if (customerPhone) {
-            paymentParams.Phone = customerPhone;
-        }
+        // НЕ добавляем Recurrent, Email и Phone на верхний уровень
+        // Email и Phone должны быть только в Receipt
         
         // Формируем чек для 54-ФЗ, если есть товары
         // ВАЖНО: Т-Банк требует Email или Phone при передаче чека
@@ -91,7 +86,7 @@ async function createPayment(paymentData) {
                 return receiptItem;
             });
             
-            // Формируем объект Receipt
+            // Формируем объект Receipt с Email/Phone внутри
             paymentParams.Receipt = {
                 Taxation: 'usn_income',
                 Items: receiptItems
