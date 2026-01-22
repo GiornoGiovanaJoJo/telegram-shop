@@ -355,21 +355,69 @@ async function handleCheckout() {
         const result = await response.json();
 
         if (result.success) {
-            // Отправка данных в Telegram (резервный вариант)
-            tg.sendData(JSON.stringify({
-                type: 'order',
-                items: state.cart,
-                total: total
-            }));
+            const orderId = result.orderId;
 
-            tg.showAlert('✅ Заказ успешно оформлен! Мы свяжемся с вами в ближайшее время.', () => {
-                // Очистить корзину после заказа
-                state.cart = [];
-                saveCart();
-                updateCartBadge();
-                renderCart();
-                showPage('main');
-            });
+            // Создаем платеж через Т-Банк
+            try {
+                const paymentApiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                    ? 'http://localhost:3000/api/payment/create'
+                    : '/api/payment/create';
+
+                const paymentResponse = await fetch(paymentApiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        orderId: orderId,
+                        amount: total,
+                        description: `Заказ #${orderId}`,
+                        items: state.cart,
+                        customer: {
+                            id: userInfo?.id,
+                            email: userInfo?.email || '',
+                            phone: userInfo?.phone || ''
+                        }
+                    })
+                });
+
+                const paymentResult = await paymentResponse.json();
+
+                if (paymentResult.success && paymentResult.paymentUrl) {
+                    // Перенаправляем на страницу оплаты
+                    tg.openLink(paymentResult.paymentUrl);
+                    
+                    tg.showAlert('✅ Заказ создан! Переходим к оплате...', () => {
+                        // Очистить корзину после создания заказа
+                        state.cart = [];
+                        saveCart();
+                        updateCartBadge();
+                        renderCart();
+                        showPage('main');
+                    });
+                } else {
+                    // Если платеж не создан, используем резервный вариант
+                    throw new Error(paymentResult.error || 'Не удалось создать платеж');
+                }
+            } catch (paymentError) {
+                console.error('Ошибка создания платежа:', paymentError);
+                
+                // Резервный вариант - отправка через Telegram
+                tg.sendData(JSON.stringify({
+                    type: 'order',
+                    items: state.cart,
+                    total: total,
+                    orderId: orderId
+                }));
+
+                tg.showAlert(`✅ Заказ #${orderId} создан!\n\n⚠️ Ошибка создания платежа. Мы свяжемся с вами для оплаты.`, () => {
+                    state.cart = [];
+                    saveCart();
+                    updateCartBadge();
+                    renderCart();
+                    showPage('main');
+                });
+            }
         } else {
             throw new Error(result.error || 'Ошибка при оформлении заказа');
         }

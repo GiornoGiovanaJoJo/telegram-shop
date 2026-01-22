@@ -4,6 +4,7 @@ const axios = require('axios');
 const path = require('path');
 const multer = require('multer');
 const db = require('./database');
+const tinkoffPayment = require('./tinkoff-payment');
 
 // Поддержка переменных окружения для хостинга
 let config;
@@ -395,26 +396,242 @@ app.delete('/api/products/:id', async (req, res) => {
 });
 
 // ============================================
-// API для платежей (подготовка, пока неактивно)
+// API для платежей Т-Банк
 // ============================================
 
-// Создать платеж (заглушка)
+// Создать платеж
 app.post('/api/payment/create', async (req, res) => {
-    // TODO: Интеграция с платежными системами
-    // Пока возвращаем заглушку
-    res.json({
-        success: false,
-        message: 'Платежная система пока не активирована',
-        paymentEnabled: false
-    });
+    try {
+        if (!tinkoffPayment.isConfigured()) {
+            return res.status(400).json({
+                success: false,
+                error: 'Платежная система Т-Банк не настроена. Проверьте TINKOFF_TERMINAL_KEY и TINKOFF_PASSWORD в config.js'
+            });
+        }
+
+        const { orderId, amount, description, items, customer } = req.body;
+
+        if (!orderId || !amount || !items || items.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'Необходимо указать orderId, amount и items'
+            });
+        }
+
+        // Формируем позиции чека
+        const receiptItems = tinkoffPayment.formatReceiptItems(items);
+
+        // Создаем платеж
+        const paymentData = {
+            amount: Math.round(amount * 100), // Конвертируем в копейки
+            orderId: orderId.toString(),
+            description: description || `Заказ #${orderId}`,
+            items: receiptItems,
+            customer: customer || {},
+            successUrl: `${req.protocol}://${req.get('host')}/payment/success?orderId=${orderId}`,
+            failureUrl: `${req.protocol}://${req.get('host')}/payment/failure?orderId=${orderId}`
+        };
+
+        const payment = await tinkoffPayment.createPayment(paymentData);
+
+        // Сохраняем платеж в БД
+        const paymentId = await db.createPayment({
+            orderId: orderId,
+            paymentSystem: 'tinkoff',
+            paymentId: payment.paymentId,
+            amount: amount,
+            currency: 'RUB',
+            status: 'pending',
+            customer: customer
+        });
+
+        res.json({
+            success: true,
+            paymentId: payment.paymentId,
+            paymentUrl: payment.paymentUrl,
+            orderId: payment.orderId,
+            dbPaymentId: paymentId
+        });
+
+    } catch (error) {
+        console.error('Ошибка создания платежа:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Ошибка создания платежа'
+        });
+    }
 });
 
-// Проверить статус платежа (заглушка)
-app.get('/api/payment/status/:id', async (req, res) => {
-    res.json({
-        success: false,
-        message: 'Платежная система пока не активирована'
-    });
+// Проверить статус платежа
+app.get('/api/payment/status/:paymentId', async (req, res) => {
+    try {
+        if (!tinkoffPayment.isConfigured()) {
+            return res.status(400).json({
+                success: false,
+                error: 'Платежная система Т-Банк не настроена'
+            });
+        }
+
+        const { paymentId } = req.params;
+        const status = await tinkoffPayment.getPaymentStatus(paymentId);
+
+        // Обновляем статус в БД
+        if (status.success) {
+            await db.updatePaymentStatus(paymentId, status.status);
+            
+            // Если платеж успешен, обновляем статус заказа
+            if (status.status === 'CONFIRMED' || status.status === 'COMPLETED') {
+                await db.updateOrderStatus(status.orderId, 'confirmed');
+            }
+        }
+
+        res.json(status);
+
+    } catch (error) {
+        console.error('Ошибка получения статуса платежа:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Ошибка получения статуса платежа'
+        });
+    }
+});
+
+// Вебхук для получения уведомлений от Т-Банк
+app.post('/api/payment/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+    try {
+        if (!tinkoffPayment.isConfigured()) {
+            return res.status(400).json({ error: 'Платежная система не настроена' });
+        }
+
+        const webhookData = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+        
+        // Обрабатываем вебхук
+        const result = await tinkoffPayment.handleWebhook(webhookData);
+
+        // Обновляем статус платежа в БД
+        await db.updatePaymentByPaymentId(result.paymentId, {
+            status: result.status === 'CONFIRMED' || result.status === 'COMPLETED' ? 'completed' : 
+                   result.status === 'REJECTED' || result.status === 'CANCELED' ? 'failed' : 'processing'
+        });
+
+        // Обновляем статус заказа
+        if (result.status === 'CONFIRMED' || result.status === 'COMPLETED') {
+            await db.updateOrderStatus(result.orderId, 'confirmed');
+        }
+
+        // Отправляем уведомление администратору
+        if (ADMIN_CHAT_ID) {
+            const statusText = result.status === 'CONFIRMED' || result.status === 'COMPLETED' 
+                ? '✅ Оплачен' 
+                : result.status === 'REJECTED' || result.status === 'CANCELED'
+                ? '❌ Отклонен'
+                : '⏳ В обработке';
+            
+            await sendTelegramMessage(
+                ADMIN_CHAT_ID,
+                `💳 Платеж обновлен\n\nЗаказ: #${result.orderId}\nСтатус: ${statusText}\nСумма: ${formatPrice(result.amount / 100)}`
+            );
+        }
+
+        res.json({ success: true });
+
+    } catch (error) {
+        console.error('Ошибка обработки вебхука:', error);
+        res.status(500).json({ error: 'Ошибка обработки вебхука' });
+    }
+});
+
+// Страницы успешной и неудачной оплаты
+app.get('/payment/success', (req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="ru">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Оплата успешна</title>
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    margin: 0;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                }
+                .container {
+                    background: white;
+                    padding: 40px;
+                    border-radius: 20px;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                    text-align: center;
+                    max-width: 400px;
+                }
+                .success-icon {
+                    font-size: 64px;
+                    margin-bottom: 20px;
+                }
+                h1 { color: #10b981; margin-bottom: 10px; }
+                p { color: #666; margin-bottom: 20px; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="success-icon">✅</div>
+                <h1>Оплата успешна!</h1>
+                <p>Ваш заказ принят в обработку. Мы свяжемся с вами в ближайшее время.</p>
+                <p>Вы можете закрыть это окно.</p>
+            </div>
+        </body>
+        </html>
+    `);
+});
+
+app.get('/payment/failure', (req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="ru">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Ошибка оплаты</title>
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    margin: 0;
+                    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                }
+                .container {
+                    background: white;
+                    padding: 40px;
+                    border-radius: 20px;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                    text-align: center;
+                    max-width: 400px;
+                }
+                .error-icon {
+                    font-size: 64px;
+                    margin-bottom: 20px;
+                }
+                h1 { color: #ef4444; margin-bottom: 10px; }
+                p { color: #666; margin-bottom: 20px; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="error-icon">❌</div>
+                <h1>Ошибка оплаты</h1>
+                <p>К сожалению, произошла ошибка при обработке платежа.</p>
+                <p>Пожалуйста, попробуйте еще раз или свяжитесь с поддержкой.</p>
+            </div>
+        </body>
+        </html>
+    `);
 });
 
 // ============================================

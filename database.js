@@ -279,10 +279,20 @@ async function getAllOrders() {
 async function createPayment(paymentData) {
     const db = await getDatabase();
     return new Promise((resolve, reject) => {
-        const {
-            order_id, payment_system, payment_id, amount, currency, payment_method,
-            card_last4, payer_name, payer_email, payer_phone, ip_address, user_agent, metadata
-        } = paymentData;
+        // Поддерживаем оба формата: snake_case и camelCase
+        const order_id = paymentData.order_id || paymentData.orderId;
+        const payment_system = paymentData.payment_system || paymentData.paymentSystem || 'tinkoff';
+        const payment_id = paymentData.payment_id || paymentData.paymentId;
+        const amount = paymentData.amount;
+        const currency = paymentData.currency || 'RUB';
+        const payment_method = paymentData.payment_method || paymentData.paymentMethod;
+        const card_last4 = paymentData.card_last4 || paymentData.cardLast4;
+        const payer_name = paymentData.payer_name || paymentData.payerName;
+        const payer_email = paymentData.payer_email || paymentData.payerEmail || (paymentData.customer?.email);
+        const payer_phone = paymentData.payer_phone || paymentData.payerPhone || (paymentData.customer?.phone);
+        const ip_address = paymentData.ip_address || paymentData.ipAddress;
+        const user_agent = paymentData.user_agent || paymentData.userAgent;
+        const metadata = paymentData.metadata;
         
         db.run(
             `INSERT INTO payments (order_id, payment_system, payment_id, amount, currency, payment_method, 
@@ -365,6 +375,61 @@ async function getPaymentByPaymentId(paymentSystem, paymentId) {
     });
 }
 
+// Обновить платеж по payment_id из платежной системы
+async function updatePaymentByPaymentId(paymentId, updateData) {
+    const db = await getDatabase();
+    return new Promise((resolve, reject) => {
+        const fields = [];
+        const values = [];
+        
+        if (updateData.status) {
+            fields.push('status = ?');
+            values.push(updateData.status);
+        }
+        if (updateData.amount !== undefined) {
+            fields.push('amount = ?');
+            values.push(updateData.amount);
+        }
+        
+        fields.push('updated_at = CURRENT_TIMESTAMP');
+        if (updateData.status === 'completed') {
+            fields.push('completed_at = CURRENT_TIMESTAMP');
+        }
+        
+        values.push(paymentId);
+        
+        db.run(
+            `UPDATE payments SET ${fields.join(', ')} WHERE payment_id = ?`,
+            values,
+            function(err) {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+                resolve(this.changes > 0);
+            }
+        );
+    });
+}
+
+// Обновить статус заказа
+async function updateOrderStatus(orderId, status) {
+    const db = await getDatabase();
+    return new Promise((resolve, reject) => {
+        db.run(
+            `UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            [status, orderId],
+            function(err) {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+                resolve(this.changes > 0);
+            }
+        );
+    });
+}
+
 // Миграция данных из JSON в БД (однократно)
 async function migrateFromJSON() {
     const fs = require('fs').promises;
@@ -415,5 +480,7 @@ module.exports = {
     createPayment,
     updatePaymentStatus,
     getPaymentByPaymentId,
+    updatePaymentByPaymentId,
+    updateOrderStatus,
     migrateFromJSON
 };
