@@ -254,19 +254,56 @@ body {
 .product-image {
     width: 100%;
     height: 180px;
-    object-fit: cover;
+    object-fit: contain;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    display: block;
+    position: relative;
+    z-index: 1;
+    transition: transform 0.3s;
+    padding: 8px;
+    box-sizing: border-box;
+}
+
+.product-card:hover .product-image {
+    /* Убрано масштабирование для сохранения размера карточки */
+}
+
+/* Галерея изображений товара */
+.product-gallery {
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.product-gallery-main {
+    width: 100%;
+    height: 320px;
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 48px;
-    position: relative;
-    z-index: 1;
-    transition: transform 0.3s;
+    flex-shrink: 0;
 }
 
-.product-card:hover .product-image {
-    transform: scale(1.05);
+.product-gallery-main img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+.product-gallery-thumbnails {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    overflow-x: auto;
+    padding: 5px 0;
 }
 
 .product-info {
@@ -308,15 +345,14 @@ body {
 .product-detail-image {
     width: 100%;
     height: 320px;
-    object-fit: cover;
+    object-fit: contain;
     border-radius: 20px;
     margin-bottom: 20px;
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 96px;
+    display: block;
     box-shadow: var(--shadow-lg);
+    padding: 16px;
+    box-sizing: border-box;
     border: 2px solid var(--border-color);
 }
 
