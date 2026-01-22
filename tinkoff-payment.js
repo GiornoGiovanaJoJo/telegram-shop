@@ -117,6 +117,17 @@ async function createPayment(paymentData) {
     if (!TINKOFF_TERMINAL_KEY || !TINKOFF_PASSWORD) {
         throw new Error('Т-Банк не настроен. Проверьте TINKOFF_TERMINAL_KEY и TINKOFF_PASSWORD в config.js');
     }
+    
+    // Проверяем, что данные не пустые
+    if (TINKOFF_TERMINAL_KEY.trim() === '' || TINKOFF_PASSWORD.trim() === '') {
+        throw new Error('Т-Банк не настроен. TINKOFF_TERMINAL_KEY и TINKOFF_PASSWORD не могут быть пустыми');
+    }
+    
+    if (DEBUG_MODE) {
+        console.log('Создание платежа Т-Банк');
+        console.log('TerminalKey:', TINKOFF_TERMINAL_KEY);
+        console.log('Password установлен:', !!TINKOFF_PASSWORD);
+    }
 
     try {
         const { amount, orderId, description, customer, successUrl, failureUrl, items } = paymentData;
