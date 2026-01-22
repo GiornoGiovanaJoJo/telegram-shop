@@ -175,10 +175,29 @@ async function createPayment(paymentData) {
         }
     } catch (error) {
         console.error('Ошибка создания платежа Т-Банк:', error);
+        
+        // Логируем полную информацию об ошибке для отладки
         if (error.response) {
-            throw new Error(error.response.data?.Message || error.response.data?.ErrorMessage || error.message);
+            console.error('Ответ от сервера Т-Банк:', {
+                status: error.response.status,
+                statusText: error.response.statusText,
+                data: error.response.data
+            });
+            
+            const errorMessage = error.response.data?.Message || 
+                               error.response.data?.ErrorMessage || 
+                               error.response.data?.Details ||
+                               `HTTP ${error.response.status}: ${error.response.statusText}`;
+            throw new Error(errorMessage);
         }
-        throw error;
+        
+        // Если это наша ошибка (уже с сообщением), просто пробрасываем
+        if (error.message) {
+            throw error;
+        }
+        
+        // Иначе создаем общую ошибку
+        throw new Error(`Ошибка связи с Т-Банк: ${error.message || 'Неизвестная ошибка'}`);
     }
 }
 

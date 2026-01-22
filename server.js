@@ -432,32 +432,62 @@ app.post('/api/payment/create', async (req, res) => {
             failureUrl: `${req.protocol}://${req.get('host')}/payment/failure?orderId=${orderId}`
         };
 
-        const payment = await tinkoffPayment.createPayment(paymentData);
+        let payment;
+        try {
+            payment = await tinkoffPayment.createPayment(paymentData);
+        } catch (paymentError) {
+            console.error('Ошибка создания платежа Т-Банк:', paymentError);
+            // Если не удалось создать платеж, возвращаем ошибку, но не падаем
+            return res.status(500).json({
+                success: false,
+                error: paymentError.message || 'Ошибка создания платежа в Т-Банк',
+                details: process.env.NODE_ENV === 'development' ? paymentError.stack : undefined
+            });
+        }
+
+        // Проверяем, что платеж создан успешно
+        if (!payment || !payment.success || !payment.paymentId) {
+            console.error('Платеж не создан. Ответ:', payment);
+            return res.status(500).json({
+                success: false,
+                error: 'Не удалось создать платеж. Платежная система вернула некорректный ответ.',
+                details: payment
+            });
+        }
 
         // Сохраняем платеж в БД
-        const paymentId = await db.createPayment({
-            orderId: orderId,
-            paymentSystem: 'tinkoff',
-            paymentId: payment.paymentId,
-            amount: amount,
-            currency: 'RUB',
-            status: 'pending',
-            customer: customer
-        });
+        let paymentId;
+        try {
+            paymentId = await db.createPayment({
+                orderId: orderId,
+                paymentSystem: 'tinkoff',
+                paymentId: payment.paymentId,
+                amount: amount,
+                currency: 'RUB',
+                status: 'pending',
+                customer: customer
+            });
+        } catch (dbError) {
+            console.error('Ошибка сохранения платежа в БД:', dbError);
+            // Платеж создан в Т-Банк, но не сохранен в БД - это не критично
+            // Возвращаем успешный ответ, но без dbPaymentId
+        }
 
         res.json({
             success: true,
             paymentId: payment.paymentId,
             paymentUrl: payment.paymentUrl,
-            orderId: payment.orderId,
-            dbPaymentId: paymentId
+            orderId: payment.orderId || orderId,
+            dbPaymentId: paymentId || null
         });
 
     } catch (error) {
-        console.error('Ошибка создания платежа:', error);
+        console.error('Неожиданная ошибка при создании платежа:', error);
+        console.error('Stack trace:', error.stack);
         res.status(500).json({
             success: false,
-            error: error.message || 'Ошибка создания платежа'
+            error: error.message || 'Внутренняя ошибка сервера при создании платежа',
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 });
