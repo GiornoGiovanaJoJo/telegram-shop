@@ -16,6 +16,9 @@ const TINKOFF_TERMINAL_KEY = process.env.TINKOFF_TERMINAL_KEY || config.TINKOFF_
 const TINKOFF_PASSWORD = process.env.TINKOFF_PASSWORD || config.TINKOFF_PASSWORD;
 const TINKOFF_API_URL = process.env.TINKOFF_API_URL || 'https://securepay.tinkoff.ru/v2/';
 
+// Логирование для отладки (только в development)
+const DEBUG_MODE = process.env.NODE_ENV === 'development' || process.env.DEBUG === 'true';
+
 /**
  * Преобразование значения в строку для подписи
  * @param {*} value - Значение для преобразования
@@ -25,9 +28,13 @@ function valueToString(value) {
     if (value === null || value === undefined) {
         return '';
     }
-    if (typeof value === 'object') {
-        // Вложенные объекты преобразуем в JSON без пробелов
+    if (typeof value === 'object' && !Array.isArray(value)) {
+        // Вложенные объекты преобразуем в JSON без пробелов, с сортировкой ключей
         return JSON.stringify(value, Object.keys(value).sort());
+    }
+    if (Array.isArray(value)) {
+        // Массивы преобразуем в JSON
+        return JSON.stringify(value);
     }
     if (typeof value === 'boolean') {
         return value ? 'true' : 'false';
@@ -37,25 +44,39 @@ function valueToString(value) {
 
 /**
  * Формирование подписи запроса для Т-Банк API
+ * Согласно документации Т-Банк:
+ * 1. Удалить поле Token
+ * 2. Отсортировать все поля по ключам
+ * 3. Конкатенировать значения
+ * 4. Добавить Password в конец
+ * 5. Вычислить SHA-256
  * @param {Object} data - Данные запроса
- * @param {string} password - Пароль терминала
+ * @param {string} password - Пароль терминала (SecretKey)
  * @returns {string} - Подпись (Token)
  */
 function generateToken(data, password) {
-    // Сортируем ключи объекта по алфавиту
-    const sortedKeys = Object.keys(data).sort();
+    // Создаем копию данных без Token
+    const dataForSign = { ...data };
+    delete dataForSign.Token;
     
-    // Формируем строку для подписи
-    const values = sortedKeys
-        .filter(key => key !== 'Token' && data[key] !== null && data[key] !== undefined)
-        .map(key => valueToString(data[key]))
-        .join('');
+    // Сортируем ключи объекта по алфавиту
+    const sortedKeys = Object.keys(dataForSign).sort();
+    
+    // Формируем строку для подписи, конкатенируя значения
+    let stringToSign = '';
+    for (const key of sortedKeys) {
+        const value = dataForSign[key];
+        // Пропускаем null и undefined
+        if (value !== null && value !== undefined) {
+            stringToSign += valueToString(value);
+        }
+    }
     
     // Добавляем пароль в конец
-    const stringToSign = values + password;
+    stringToSign += password;
     
     // Вычисляем SHA-256 хеш
-    const hash = crypto.createHash('sha256').update(stringToSign).digest('hex');
+    const hash = crypto.createHash('sha256').update(stringToSign, 'utf8').digest('hex');
     
     return hash;
 }
@@ -157,6 +178,13 @@ async function createPayment(paymentData) {
 
         // Генерируем подпись
         requestData.Token = generateToken(requestData, TINKOFF_PASSWORD);
+        
+        // Логирование для отладки
+        if (DEBUG_MODE) {
+            console.log('Запрос к Т-Банк:', JSON.stringify(requestData, null, 2));
+            console.log('TerminalKey:', TINKOFF_TERMINAL_KEY);
+            console.log('Password length:', TINKOFF_PASSWORD ? TINKOFF_PASSWORD.length : 0);
+        }
 
         // Отправляем запрос
         const response = await axios.post(`${TINKOFF_API_URL}Init`, requestData, {
