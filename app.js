@@ -149,8 +149,8 @@ function showProduct(productId) {
     if (productImages.length > 0) {
         galleryHTML = `
             <div class="product-gallery" style="position: relative; margin-bottom: 20px;">
-                <div class="product-gallery-main" style="width: 100%; height: 320px; position: relative; border-radius: 20px; overflow: hidden; box-shadow: var(--shadow-lg);">
-                    <img id="product-main-image" src="${productImages[0]}" alt="${product.name}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'; this.parentElement.querySelector('.product-detail-image-fallback').style.display='flex';">
+                <div class="product-gallery-main" style="width: 100%; height: 320px; position: relative; border-radius: 20px; overflow: hidden; box-shadow: var(--shadow-lg); background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); display: flex; align-items: center; justify-content: center;">
+                    <img id="product-main-image" src="${productImages[0]}" alt="${product.name}" style="max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; padding: 16px; box-sizing: border-box;" onerror="this.style.display='none'; this.parentElement.querySelector('.product-detail-image-fallback').style.display='flex';">
                     <div class="product-detail-image-fallback" style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 96px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);">${product.emoji}</div>
                     ${productImages.length > 1 ? `
                         <button class="gallery-nav-btn gallery-prev" onclick="changeProductImage(-1)" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.9); border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">‹</button>
@@ -452,6 +452,14 @@ function updateProductImage() {
     
     if (mainImage && state.productImages[state.currentImageIndex]) {
         mainImage.src = state.productImages[state.currentImageIndex];
+        // Убеждаемся, что стили применяются правильно
+        mainImage.style.maxWidth = '100%';
+        mainImage.style.maxHeight = '100%';
+        mainImage.style.width = 'auto';
+        mainImage.style.height = 'auto';
+        mainImage.style.objectFit = 'contain';
+        mainImage.style.padding = '16px';
+        mainImage.style.boxSizing = 'border-box';
     }
     
     if (currentIndicator) {
