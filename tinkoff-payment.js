@@ -203,9 +203,11 @@ async function createPayment(paymentData) {
         // Генерируем подпись
         requestData.Token = generateToken(requestData, TINKOFF_PASSWORD);
         
-        if (DEBUG_MODE) {
-            console.log('Запрос к Т-Банк:', JSON.stringify(requestData, null, 2));
-        }
+        // ВРЕМЕННОЕ ЛОГИРОВАНИЕ ДЛЯ ОТЛАДКИ - всегда включаем
+        console.log('=== ОТЛАДКА: Запрос к Т-Банк ===');
+        console.log('TerminalKey:', TINKOFF_TERMINAL_KEY);
+        console.log('Password установлен:', !!TINKOFF_PASSWORD);
+        console.log('Запрос:', JSON.stringify(requestData, null, 2));
 
         // Отправляем запрос
         const response = await axios.post(`${TINKOFF_API_URL}Init`, requestData, {
