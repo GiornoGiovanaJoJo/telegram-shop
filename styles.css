@@ -226,6 +226,10 @@ body {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border: 1px solid var(--border-color);
     position: relative;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .product-card::before {
@@ -311,6 +315,10 @@ body {
     position: relative;
     z-index: 1;
     background: var(--surface);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .product-name {
@@ -323,6 +331,10 @@ body {
     -webkit-box-orient: vertical;
     overflow: hidden;
     line-height: 1.4;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    max-width: 100%;
 }
 
 .product-price {
@@ -340,6 +352,10 @@ body {
 /* Product Details */
 .product-details {
     padding: 16px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .product-detail-image {
@@ -360,6 +376,11 @@ body {
     font-size: 24px;
     font-weight: 600;
     margin-bottom: 8px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    max-width: 100%;
+    white-space: normal;
 }
 
 .product-detail-price {
@@ -374,6 +395,12 @@ body {
     color: var(--text-secondary);
     line-height: 1.6;
     margin-bottom: 24px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    max-width: 100%;
+    white-space: normal;
+    overflow: hidden;
 }
 
 .quantity-controls {
@@ -465,6 +492,10 @@ body {
     box-shadow: var(--shadow);
     border: 1px solid var(--border-color);
     transition: all 0.3s;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .cart-item:hover {
@@ -485,12 +516,21 @@ body {
 
 .cart-item-info {
     flex: 1;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+    min-width: 0;
 }
 
 .cart-item-name {
     font-size: 16px;
     font-weight: 600;
     margin-bottom: 4px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    max-width: 100%;
+    white-space: normal;
 }
 
 .cart-item-price {
@@ -619,6 +659,12 @@ body {
     border-radius: 12px;
     border-left: 4px solid var(--primary-color);
     box-shadow: var(--shadow);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    max-width: 100%;
+    white-space: normal;
+    overflow: hidden;
 }
 
 .quantity-controls {
