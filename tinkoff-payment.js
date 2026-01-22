@@ -114,28 +114,45 @@ async function createPayment(paymentData) {
         };
 
         // Добавляем данные клиента, если они есть
-        if (customer?.email) {
-            requestData.Email = customer.email;
+        const customerEmail = customer?.email || '';
+        const customerPhone = customer?.phone || '';
+        
+        if (customerEmail) {
+            requestData.Email = customerEmail;
         }
-        if (customer?.phone) {
-            requestData.Phone = customer.phone;
+        if (customerPhone) {
+            requestData.Phone = customerPhone;
         }
 
         // Формируем чек для 54-ФЗ, если есть товары
+        // ВАЖНО: Т-Банк требует Email или Phone при передаче чека
         if (items && items.length > 0) {
-            requestData.Receipt = {
-                Email: customer?.email || '',
-                Phone: customer?.phone || '',
-                Taxation: 'usn_income',
-                Items: items.map(item => ({
-                    Name: item.Name || item.name,
-                    Price: item.Price || Math.round((item.price || 0) * 100),
-                    Quantity: item.Quantity || item.quantity || 1,
-                    Amount: item.Amount || Math.round((item.price || 0) * (item.quantity || 1) * 100),
-                    Tax: item.Tax || 'none',
-                    Ean13: item.Ean13 || item.sku || ''
-                }))
-            };
+            // Передаем чек только если есть хотя бы email или phone
+            if (customerEmail || customerPhone) {
+                requestData.Receipt = {
+                    Taxation: 'usn_income',
+                    Items: items.map(item => ({
+                        Name: item.Name || item.name,
+                        Price: item.Price || Math.round((item.price || 0) * 100),
+                        Quantity: item.Quantity || item.quantity || 1,
+                        Amount: item.Amount || Math.round((item.price || 0) * (item.quantity || 1) * 100),
+                        Tax: item.Tax || 'none',
+                        Ean13: item.Ean13 || item.sku || ''
+                    }))
+                };
+                
+                // Добавляем Email или Phone в чек (хотя бы одно обязательно)
+                if (customerEmail) {
+                    requestData.Receipt.Email = customerEmail;
+                }
+                if (customerPhone) {
+                    requestData.Receipt.Phone = customerPhone;
+                }
+            } else {
+                // Если нет email и phone, но есть товары - не передаем чек
+                // Это допустимо, но чек не будет сформирован для 54-ФЗ
+                console.warn('Предупреждение: Не передается чек, так как отсутствуют Email и Phone клиента');
+            }
         }
 
         // Генерируем подпись

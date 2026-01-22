@@ -363,6 +363,21 @@ async function handleCheckout() {
                     ? 'http://localhost:3000/api/payment/create'
                     : '/api/payment/create';
 
+                // Формируем данные клиента для платежа
+                // Т-Банк требует Email или Phone при передаче чека
+                const customerData = {
+                    id: userInfo?.id,
+                    email: userInfo?.email || '',
+                    phone: userInfo?.phone || ''
+                };
+                
+                // Если нет email и phone, пытаемся использовать username как идентификатор
+                if (!customerData.email && !customerData.phone && userInfo?.username) {
+                    // Можно использовать username@telegram.local как временный email
+                    // или просто не передавать чек
+                    console.log('Email и Phone не указаны, чек не будет передан');
+                }
+
                 const paymentResponse = await fetch(paymentApiUrl, {
                     method: 'POST',
                     headers: {
@@ -373,11 +388,7 @@ async function handleCheckout() {
                         amount: total,
                         description: `Заказ #${orderId}`,
                         items: state.cart,
-                        customer: {
-                            id: userInfo?.id,
-                            email: userInfo?.email || '',
-                            phone: userInfo?.phone || ''
-                        }
+                        customer: customerData
                     })
                 });
 
