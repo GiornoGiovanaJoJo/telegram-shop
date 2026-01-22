@@ -437,12 +437,37 @@ app.post('/api/payment/create', async (req, res) => {
             payment = await tinkoffPayment.createPayment(paymentData);
         } catch (paymentError) {
             console.error('Ошибка создания платежа Т-Банк:', paymentError);
-            // Если не удалось создать платеж, возвращаем ошибку, но не падаем
-            return res.status(500).json({
-                success: false,
-                error: paymentError.message || 'Ошибка создания платежа в Т-Банк',
-                details: process.env.NODE_ENV === 'development' ? paymentError.stack : undefined
-            });
+            
+            // Обработка ошибки "Заказ с таким order_id уже существует" (код '8')
+            if (paymentError.code === '8' || (paymentError.details && paymentError.details.includes('уже существует'))) {
+                console.log(`Платеж с orderId ${orderId} уже существует, создаем новый с уникальным orderId...`);
+                
+                // Создаем новый платеж с уникальным orderId (добавляем timestamp)
+                const uniqueOrderId = `${orderId}-${Date.now()}`;
+                paymentData.orderId = uniqueOrderId;
+                paymentData.description = `${description || `Заказ #${orderId}`}`;
+                
+                try {
+                    payment = await tinkoffPayment.createPayment(paymentData);
+                    console.log(`Платеж успешно создан с уникальным orderId: ${uniqueOrderId}`);
+                } catch (retryError) {
+                    console.error('Ошибка создания платежа с уникальным orderId:', retryError);
+                    return res.status(500).json({
+                        success: false,
+                        error: retryError.message || 'Ошибка создания платежа в Т-Банк',
+                        details: process.env.NODE_ENV === 'development' ? retryError.stack : undefined
+                    });
+                }
+            } else {
+                // Для других ошибок возвращаем стандартный ответ
+                return res.status(500).json({
+                    success: false,
+                    error: paymentError.message || 'Ошибка создания платежа в Т-Банк',
+                    details: process.env.NODE_ENV === 'development' ? paymentError.stack : undefined,
+                    code: paymentError.code,
+                    errorDetails: paymentError.details
+                });
+            }
         }
 
         // Проверяем, что платеж создан успешно

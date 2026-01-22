@@ -375,6 +375,31 @@ async function getPaymentByPaymentId(paymentSystem, paymentId) {
     });
 }
 
+async function getPaymentByOrderId(orderId) {
+    const db = await getDatabase();
+    return new Promise((resolve, reject) => {
+        db.get(
+            'SELECT * FROM payments WHERE order_id = ? ORDER BY created_at DESC LIMIT 1',
+            [orderId],
+            (err, row) => {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+                if (!row) {
+                    resolve(null);
+                    return;
+                }
+                const payment = {
+                    ...row,
+                    metadata: row.metadata ? JSON.parse(row.metadata) : null
+                };
+                resolve(payment);
+            }
+        );
+    });
+}
+
 // Обновить платеж по payment_id из платежной системы
 async function updatePaymentByPaymentId(paymentId, updateData) {
     const db = await getDatabase();
@@ -480,6 +505,7 @@ module.exports = {
     createPayment,
     updatePaymentStatus,
     getPaymentByPaymentId,
+    getPaymentByOrderId,
     updatePaymentByPaymentId,
     updateOrderStatus,
     migrateFromJSON
