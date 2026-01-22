@@ -1,0 +1,24 @@
+# Конфигурационные файлы с секретами
+config.js
+
+# Временные батники (создаются автоматически)
+start_server.bat
+start_cloudflared.bat
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Временные файлы
+*.log
+.DS_Store
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

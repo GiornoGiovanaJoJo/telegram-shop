@@ -112,6 +112,17 @@ function renderProducts() {
         return matchesCategory && matchesSearch;
     });
 
+    if (filtered.length === 0) {
+        elements.productsGrid.innerHTML = `
+            <div class="empty-products">
+                <div class="empty-products-icon">🔍</div>
+                <div class="empty-products-title">Товары не найдены</div>
+                <div class="empty-products-text">${state.searchQuery ? 'Попробуйте изменить поисковый запрос' : 'Попробуйте выбрать другую категорию'}</div>
+            </div>
+        `;
+        return;
+    }
+
     elements.productsGrid.innerHTML = filtered.map(product => {
         // Получаем первое изображение (поддержка старого формата)
         const productImages = product.images || (product.image ? [product.image] : []);

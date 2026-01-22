@@ -68,29 +68,6 @@ app.use(express.json());
 app.use(express.static(__dirname));
 app.use('/фото', express.static(uploadsDir));
 
-// Функции для работы с товарами
-const PRODUCTS_FILE = path.join(__dirname, 'products.json');
-
-async function loadProducts() {
-    try {
-        const data = await fs.readFile(PRODUCTS_FILE, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error('Ошибка загрузки товаров:', error);
-        return [];
-    }
-}
-
-async function saveProducts(products) {
-    try {
-        await fs.writeFile(PRODUCTS_FILE, JSON.stringify(products, null, 2), 'utf8');
-        return true;
-    } catch (error) {
-        console.error('Ошибка сохранения товаров:', error);
-        return false;
-    }
-}
-
 // Функция для отправки сообщения в Telegram
 async function sendTelegramMessage(chatId, text, parseMode = 'HTML') {
     if (!BOT_TOKEN) {
@@ -274,8 +251,6 @@ app.post('/api/upload', upload.single('image'), handleMulterError, (req, res) =>
 // Создать новый товар (с поддержкой загрузки нескольких файлов)
 app.post('/api/products', upload.array('images', 10), handleMulterError, async (req, res) => {
     try {
-        const products = await loadProducts();
-        
         // Обработка загруженных файлов
         let images = [];
         if (req.files && req.files.length > 0) {
