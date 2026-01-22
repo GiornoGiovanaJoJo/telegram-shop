@@ -46,10 +46,10 @@ function valueToString(value) {
  * Формирование подписи запроса для Т-Банк API
  * Согласно документации Т-Банк:
  * 1. Удалить поле Token
- * 2. Отсортировать все поля по ключам
- * 3. Конкатенировать значения
- * 4. Добавить Password в конец
- * 5. Вычислить SHA-256
+ * 2. Добавить поле Password со значением SecretKey
+ * 3. Отсортировать все поля по ключам (алфавитный порядок)
+ * 4. Конкатенировать значения полей в порядке сортировки
+ * 5. Вычислить SHA-256 хеш
  * @param {Object} data - Данные запроса
  * @param {string} password - Пароль терминала (SecretKey)
  * @returns {string} - Подпись (Token)
@@ -59,10 +59,13 @@ function generateToken(data, password) {
     const dataForSign = { ...data };
     delete dataForSign.Token;
     
+    // Добавляем Password в объект данных (согласно документации)
+    dataForSign.Password = password;
+    
     // Сортируем ключи объекта по алфавиту
     const sortedKeys = Object.keys(dataForSign).sort();
     
-    // Формируем строку для подписи, конкатенируя значения
+    // Формируем строку для подписи, конкатенируя значения в порядке сортировки
     let stringToSign = '';
     for (const key of sortedKeys) {
         const value = dataForSign[key];
@@ -72,11 +75,14 @@ function generateToken(data, password) {
         }
     }
     
-    // Добавляем пароль в конец
-    stringToSign += password;
-    
     // Вычисляем SHA-256 хеш
     const hash = crypto.createHash('sha256').update(stringToSign, 'utf8').digest('hex');
+    
+    if (DEBUG_MODE) {
+        console.log('Данные для подписи:', JSON.stringify(dataForSign, null, 2));
+        console.log('Строка для подписи (первые 100 символов):', stringToSign.substring(0, 100) + '...');
+        console.log('Сгенерированный токен:', hash);
+    }
     
     return hash;
 }
