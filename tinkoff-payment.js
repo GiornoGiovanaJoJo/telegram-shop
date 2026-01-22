@@ -1,5 +1,6 @@
 // Модуль для работы с платежной системой Т-Банк (Tinkoff)
-const { TinkoffPaymentSDK } = require('@sfomin/tinkoff-payment-sdk');
+// Прямая интеграция через axios без внешних SDK
+const axios = require('axios');
 const crypto = require('crypto');
 
 // Поддержка переменных окружения для хостинга
@@ -15,14 +16,49 @@ const TINKOFF_TERMINAL_KEY = process.env.TINKOFF_TERMINAL_KEY || config.TINKOFF_
 const TINKOFF_PASSWORD = process.env.TINKOFF_PASSWORD || config.TINKOFF_PASSWORD;
 const TINKOFF_API_URL = process.env.TINKOFF_API_URL || 'https://securepay.tinkoff.ru/v2/';
 
-// Инициализация SDK
-let tinkoffSDK = null;
-if (TINKOFF_TERMINAL_KEY && TINKOFF_PASSWORD) {
-    tinkoffSDK = new TinkoffPaymentSDK({
-        terminalKey: TINKOFF_TERMINAL_KEY,
-        password: TINKOFF_PASSWORD,
-        apiUrl: TINKOFF_API_URL
-    });
+/**
+ * Формирование подписи запроса для Т-Банк API
+ * @param {Object} data - Данные запроса
+ * @param {string} password - Пароль терминала
+ * @returns {string} - Подпись (Token)
+ */
+function generateToken(data, password) {
+    // Сортируем ключи объекта по алфавиту
+    const sortedKeys = Object.keys(data).sort();
+    
+    // Формируем строку для подписи
+    const values = sortedKeys
+        .filter(key => key !== 'Token' && data[key] !== null && data[key] !== undefined)
+        .map(key => data[key])
+        .join('');
+    
+    // Добавляем пароль в конец
+    const stringToSign = values + password;
+    
+    // Вычисляем SHA-256 хеш
+    const hash = crypto.createHash('sha256').update(stringToSign).digest('hex');
+    
+    return hash;
+}
+
+/**
+ * Проверка подписи ответа от Т-Банк
+ * @param {Object} data - Данные ответа
+ * @param {string} password - Пароль терминала
+ * @returns {boolean} - true если подпись верна
+ */
+function verifyToken(data, password) {
+    const receivedToken = data.Token;
+    if (!receivedToken) {
+        return false;
+    }
+    
+    // Удаляем Token из данных для проверки
+    const dataWithoutToken = { ...data };
+    delete dataWithoutToken.Token;
+    
+    const calculatedToken = generateToken(dataWithoutToken, password);
+    return calculatedToken === receivedToken;
 }
 
 /**
@@ -34,59 +70,89 @@ if (TINKOFF_TERMINAL_KEY && TINKOFF_PASSWORD) {
  * @param {Object} paymentData.customer - Данные клиента
  * @param {string} paymentData.successUrl - URL для редиректа после успешной оплаты
  * @param {string} paymentData.failureUrl - URL для редиректа после неудачной оплаты
+ * @param {Array} paymentData.items - Товары для чека
  * @returns {Promise<Object>} - Данные платежа
  */
 async function createPayment(paymentData) {
-    if (!tinkoffSDK) {
-        throw new Error('Т-Банк SDK не инициализирован. Проверьте TINKOFF_TERMINAL_KEY и TINKOFF_PASSWORD в config.js');
+    if (!TINKOFF_TERMINAL_KEY || !TINKOFF_PASSWORD) {
+        throw new Error('Т-Банк не настроен. Проверьте TINKOFF_TERMINAL_KEY и TINKOFF_PASSWORD в config.js');
     }
 
     try {
-        const { amount, orderId, description, customer, successUrl, failureUrl } = paymentData;
+        const { amount, orderId, description, customer, successUrl, failureUrl, items } = paymentData;
 
         // Формируем данные для создания платежа
-        const paymentRequest = {
+        const requestData = {
+            TerminalKey: TINKOFF_TERMINAL_KEY,
             Amount: amount, // Сумма в копейках
             OrderId: orderId.toString(),
             Description: description || `Заказ #${orderId}`,
-            SuccessURL: successUrl || `${process.env.BASE_URL || 'http://localhost:3000'}/payment/success?orderId=${orderId}`,
-            FailURL: failureUrl || `${process.env.BASE_URL || 'http://localhost:3000'}/payment/failure?orderId=${orderId}`,
-            NotificationURL: `${process.env.BASE_URL || 'http://localhost:3000'}/api/payment/webhook`,
+            SuccessURL: successUrl || `${process.env.BASE_URL || config.BASE_URL || 'http://localhost:3000'}/payment/success?orderId=${orderId}`,
+            FailURL: failureUrl || `${process.env.BASE_URL || config.BASE_URL || 'http://localhost:3000'}/payment/failure?orderId=${orderId}`,
+            NotificationURL: `${process.env.BASE_URL || config.BASE_URL || 'http://localhost:3000'}/api/payment/webhook`,
             Recurrent: 'N',
-            CustomerKey: customer?.id?.toString() || orderId.toString(),
-            Receipt: {
-                Email: customer?.email || '',
-                Phone: customer?.phone || '',
-                Taxation: 'usn_income',
-                Items: paymentData.items || []
-            }
+            CustomerKey: customer?.id?.toString() || orderId.toString()
         };
 
         // Добавляем данные клиента, если они есть
         if (customer?.email) {
-            paymentRequest.Receipt.Email = customer.email;
+            requestData.Email = customer.email;
         }
         if (customer?.phone) {
-            paymentRequest.Receipt.Phone = customer.phone;
+            requestData.Phone = customer.phone;
         }
 
-        // Создаем платеж через SDK
-        const response = await tinkoffSDK.init(paymentRequest);
+        // Формируем чек для 54-ФЗ, если есть товары
+        if (items && items.length > 0) {
+            requestData.Receipt = {
+                Email: customer?.email || '',
+                Phone: customer?.phone || '',
+                Taxation: 'usn_income',
+                Items: items.map(item => ({
+                    Name: item.Name || item.name,
+                    Price: item.Price || Math.round((item.price || 0) * 100),
+                    Quantity: item.Quantity || item.quantity || 1,
+                    Amount: item.Amount || Math.round((item.price || 0) * (item.quantity || 1) * 100),
+                    Tax: item.Tax || 'none',
+                    Ean13: item.Ean13 || item.sku || ''
+                }))
+            };
+        }
 
-        if (response.Success) {
+        // Генерируем подпись
+        requestData.Token = generateToken(requestData, TINKOFF_PASSWORD);
+
+        // Отправляем запрос
+        const response = await axios.post(`${TINKOFF_API_URL}Init`, requestData, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const responseData = response.data;
+
+        // Проверяем подпись ответа
+        if (!verifyToken(responseData, TINKOFF_PASSWORD)) {
+            throw new Error('Неверная подпись ответа от Т-Банк');
+        }
+
+        if (responseData.Success === 'true' || responseData.Success === true) {
             return {
                 success: true,
-                paymentId: response.PaymentId,
-                paymentUrl: response.PaymentURL,
-                orderId: response.OrderId,
-                amount: response.Amount,
-                status: response.Status
+                paymentId: responseData.PaymentId,
+                paymentUrl: responseData.PaymentURL,
+                orderId: responseData.OrderId,
+                amount: responseData.Amount,
+                status: responseData.Status
             };
         } else {
-            throw new Error(response.Message || 'Ошибка создания платежа');
+            throw new Error(responseData.Message || responseData.ErrorMessage || 'Ошибка создания платежа');
         }
     } catch (error) {
         console.error('Ошибка создания платежа Т-Банк:', error);
+        if (error.response) {
+            throw new Error(error.response.data?.Message || error.response.data?.ErrorMessage || error.message);
+        }
         throw error;
     }
 }
@@ -97,26 +163,48 @@ async function createPayment(paymentData) {
  * @returns {Promise<Object>} - Статус платежа
  */
 async function getPaymentStatus(paymentId) {
-    if (!tinkoffSDK) {
-        throw new Error('Т-Банк SDK не инициализирован');
+    if (!TINKOFF_TERMINAL_KEY || !TINKOFF_PASSWORD) {
+        throw new Error('Т-Банк не настроен');
     }
 
     try {
-        const response = await tinkoffSDK.getState({ PaymentId: paymentId });
+        const requestData = {
+            TerminalKey: TINKOFF_TERMINAL_KEY,
+            PaymentId: paymentId.toString()
+        };
 
-        if (response.Success) {
+        // Генерируем подпись
+        requestData.Token = generateToken(requestData, TINKOFF_PASSWORD);
+
+        const response = await axios.post(`${TINKOFF_API_URL}GetState`, requestData, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const responseData = response.data;
+
+        // Проверяем подпись ответа
+        if (!verifyToken(responseData, TINKOFF_PASSWORD)) {
+            throw new Error('Неверная подпись ответа от Т-Банк');
+        }
+
+        if (responseData.Success === 'true' || responseData.Success === true) {
             return {
                 success: true,
-                paymentId: response.PaymentId,
-                orderId: response.OrderId,
-                status: response.Status,
-                amount: response.Amount
+                paymentId: responseData.PaymentId,
+                orderId: responseData.OrderId,
+                status: responseData.Status,
+                amount: responseData.Amount
             };
         } else {
-            throw new Error(response.Message || 'Ошибка получения статуса платежа');
+            throw new Error(responseData.Message || responseData.ErrorMessage || 'Ошибка получения статуса платежа');
         }
     } catch (error) {
         console.error('Ошибка получения статуса платежа Т-Банк:', error);
+        if (error.response) {
+            throw new Error(error.response.data?.Message || error.response.data?.ErrorMessage || error.message);
+        }
         throw error;
     }
 }
@@ -127,13 +215,13 @@ async function getPaymentStatus(paymentId) {
  * @returns {Promise<Object>} - Результат обработки
  */
 async function handleWebhook(webhookData) {
-    if (!tinkoffSDK) {
-        throw new Error('Т-Банк SDK не инициализирован');
+    if (!TINKOFF_TERMINAL_KEY || !TINKOFF_PASSWORD) {
+        throw new Error('Т-Банк не настроен');
     }
 
     try {
         // Проверяем подпись вебхука
-        const isValid = tinkoffSDK.verifyWebhook(webhookData);
+        const isValid = verifyToken(webhookData, TINKOFF_PASSWORD);
         
         if (!isValid) {
             throw new Error('Неверная подпись вебхука');
@@ -159,34 +247,52 @@ async function handleWebhook(webhookData) {
  * @returns {Promise<Object>} - Результат отмены
  */
 async function cancelPayment(paymentId, amount = null) {
-    if (!tinkoffSDK) {
-        throw new Error('Т-Банк SDK не инициализирован');
+    if (!TINKOFF_TERMINAL_KEY || !TINKOFF_PASSWORD) {
+        throw new Error('Т-Банк не настроен');
     }
 
     try {
-        const cancelData = {
-            PaymentId: paymentId
+        const requestData = {
+            TerminalKey: TINKOFF_TERMINAL_KEY,
+            PaymentId: paymentId.toString()
         };
 
         if (amount) {
-            cancelData.Amount = amount;
+            requestData.Amount = Math.round(amount * 100); // Конвертируем в копейки
         }
 
-        const response = await tinkoffSDK.cancel(cancelData);
+        // Генерируем подпись
+        requestData.Token = generateToken(requestData, TINKOFF_PASSWORD);
 
-        if (response.Success) {
+        const response = await axios.post(`${TINKOFF_API_URL}Cancel`, requestData, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const responseData = response.data;
+
+        // Проверяем подпись ответа
+        if (!verifyToken(responseData, TINKOFF_PASSWORD)) {
+            throw new Error('Неверная подпись ответа от Т-Банк');
+        }
+
+        if (responseData.Success === 'true' || responseData.Success === true) {
             return {
                 success: true,
-                paymentId: response.PaymentId,
-                orderId: response.OrderId,
-                newAmount: response.NewAmount,
-                status: response.Status
+                paymentId: responseData.PaymentId,
+                orderId: responseData.OrderId,
+                newAmount: responseData.NewAmount,
+                status: responseData.Status
             };
         } else {
-            throw new Error(response.Message || 'Ошибка отмены платежа');
+            throw new Error(responseData.Message || responseData.ErrorMessage || 'Ошибка отмены платежа');
         }
     } catch (error) {
         console.error('Ошибка отмены платежа Т-Банк:', error);
+        if (error.response) {
+            throw new Error(error.response.data?.Message || error.response.data?.ErrorMessage || error.message);
+        }
         throw error;
     }
 }
