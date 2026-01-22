@@ -553,18 +553,24 @@ app.get('/api/payment/status/:paymentId', async (req, res) => {
 // Вебхук для получения уведомлений от Т-Банк
 app.post('/api/payment/webhook', express.json(), async (req, res) => {
     try {
+        console.log('=== ВЕБХУК ОТ Т-БАНК ===');
+        console.log('Получены данные:', JSON.stringify(req.body, null, 2));
+        
         if (!tinkoffPayment.isConfigured()) {
+            console.error('Платежная система не настроена');
             return res.status(400).json({ error: 'Платежная система не настроена' });
         }
 
         const webhookData = req.body;
         
         if (!webhookData) {
+            console.error('Пустое тело запроса');
             return res.status(400).json({ error: 'Пустое тело запроса' });
         }
         
         // Обрабатываем вебхук
         const result = await tinkoffPayment.handleWebhook(webhookData);
+        console.log('Результат обработки вебхука:', JSON.stringify(result, null, 2));
 
         // Обновляем статус платежа в БД
         await db.updatePaymentByPaymentId(result.paymentId, {
@@ -574,13 +580,19 @@ app.post('/api/payment/webhook', express.json(), async (req, res) => {
 
         // Обновляем статус заказа
         if (result.status === 'CONFIRMED' || result.status === 'COMPLETED') {
-            await db.updateOrderStatus(result.orderId, 'confirmed');
+            // Извлекаем оригинальный orderId (может быть формат "2-1769094387607", нужен "2")
+            const originalOrderId = result.orderId.toString().split('-')[0];
+            console.log(`Обработка успешной оплаты. OrderId из вебхука: ${result.orderId}, оригинальный: ${originalOrderId}`);
+            
+            await db.updateOrderStatus(originalOrderId, 'confirmed');
             
             // Отправляем полную информацию администратору только после успешной оплаты
             if (ADMIN_CHAT_ID) {
+                console.log(`ADMIN_CHAT_ID установлен: ${ADMIN_CHAT_ID}`);
                 try {
-                    // Получаем полную информацию о заказе
-                    const order = await db.getOrderById(result.orderId);
+                    // Получаем полную информацию о заказе по оригинальному ID
+                    const order = await db.getOrderById(originalOrderId);
+                    console.log('Заказ найден:', order ? `ID ${order.id}` : 'не найден');
                     
                     if (order) {
                         // Формируем сообщение с полной информацией
@@ -633,27 +645,43 @@ app.post('/api/payment/webhook', express.json(), async (req, res) => {
                         message += `💳 ID платежа: ${result.paymentId}`;
                         
                         await sendTelegramMessage(ADMIN_CHAT_ID, message);
+                        console.log('Уведомление администратору отправлено успешно');
+                    } else {
+                        console.error('Заказ не найден в БД');
                     }
                 } catch (orderError) {
                     console.error('Ошибка получения данных заказа для уведомления:', orderError);
+                    console.error('Stack trace:', orderError.stack);
                     // Отправляем базовое уведомление в случае ошибки
-                    await sendTelegramMessage(
-                        ADMIN_CHAT_ID,
-                        `✅ <b>ЗАКАЗ ОПЛАЧЕН</b>\n\nЗаказ: #${result.orderId}\nСумма: ${formatPrice(result.amount / 100)}\nПлатеж: ${result.paymentId}`
-                    );
+                    try {
+                        await sendTelegramMessage(
+                            ADMIN_CHAT_ID,
+                            `✅ <b>ЗАКАЗ ОПЛАЧЕН</b>\n\nЗаказ: #${originalOrderId}\nСумма: ${formatPrice(result.amount / 100)}\nПлатеж: ${result.paymentId}`
+                        );
+                        console.log('Базовое уведомление отправлено');
+                    } catch (sendError) {
+                        console.error('Ошибка отправки базового уведомления:', sendError);
+                    }
                 }
+            } else {
+                console.warn('ADMIN_CHAT_ID не установлен! Уведомление не будет отправлено.');
             }
         } else if (result.status === 'REJECTED' || result.status === 'CANCELED') {
             // Отправляем уведомление об отклонении
             if (ADMIN_CHAT_ID) {
+                const originalOrderId = result.orderId.toString().split('-')[0];
                 await sendTelegramMessage(
                     ADMIN_CHAT_ID,
-                    `❌ <b>ПЛАТЕЖ ОТКЛОНЕН</b>\n\nЗаказ: #${result.orderId}\nСтатус: ${result.status}\nСумма: ${formatPrice(result.amount / 100)}`
+                    `❌ <b>ПЛАТЕЖ ОТКЛОНЕН</b>\n\nЗаказ: #${originalOrderId}\nСтатус: ${result.status}\nСумма: ${formatPrice(result.amount / 100)}`
                 );
+                console.log('Уведомление об отклонении отправлено');
             }
+        } else {
+            console.log(`Статус платежа: ${result.status} - уведомление не требуется`);
         }
 
         // Т-Банк требует ответ "OK" заглавными буквами
+        console.log('Отправляем ответ OK в Т-Банк');
         res.status(200).send('OK');
 
     } catch (error) {
