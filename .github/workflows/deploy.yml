@@ -58,7 +58,7 @@ jobs:
             
             echo "🧪 Проверка конфигурации Nginx..."
             sudo nginx -t
-            sudo systemctl reload nginx
+            sudo systemctl restart nginx
             
             # Показать, какие сайты включены
             echo "📂 Активные конфигурации в sites-enabled:"
