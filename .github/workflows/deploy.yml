@@ -51,11 +51,24 @@ jobs:
             echo "⚙️  Обновление конфигурации Nginx..."
             sudo cp vps-deploy/nginx.conf /etc/nginx/sites-available/telegram-shop
             sudo ln -sf /etc/nginx/sites-available/telegram-shop /etc/nginx/sites-enabled/
+            
+            # Удаляем все дефолтные конфиги, которые могут перехватывать трафик
             sudo rm -f /etc/nginx/sites-enabled/default
-            sudo nginx -t && sudo systemctl reload nginx
+            sudo rm -f /etc/nginx/conf.d/default.conf
+            
+            echo "🧪 Проверка конфигурации Nginx..."
+            sudo nginx -t
+            sudo systemctl reload nginx
+            
+            # Показать, какие сайты включены
+            echo "📂 Активные конфигурации в sites-enabled:"
+            ls -l /etc/nginx/sites-enabled/
             
             # 6. Финальный запуск
             echo "▶️  Запуск приложения..."
             npm install --production
             pm2 restart telegram-shop || pm2 start pm2.config.js
             pm2 save
+            
+            echo "✅ Статус приложения в PM2:"
+            pm2 status telegram-shop
