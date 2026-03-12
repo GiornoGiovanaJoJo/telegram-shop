@@ -47,7 +47,14 @@ jobs:
               ./vps-deploy/setup.sh
             fi
             
-            # 5. Финальный запуск
+            # 5. Настройка Nginx (автоматическая привязка конфига)
+            echo "⚙️  Обновление конфигурации Nginx..."
+            sudo cp vps-deploy/nginx.conf /etc/nginx/sites-available/telegram-shop
+            sudo ln -sf /etc/nginx/sites-available/telegram-shop /etc/nginx/sites-enabled/
+            sudo rm -f /etc/nginx/sites-enabled/default
+            sudo nginx -t && sudo systemctl reload nginx
+            
+            # 6. Финальный запуск
             echo "▶️  Запуск приложения..."
             npm install --production
             pm2 restart telegram-shop || pm2 start pm2.config.js
