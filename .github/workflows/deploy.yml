@@ -21,26 +21,34 @@ jobs:
           username: ${{ secrets.VPS_USERNAME }}
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
-            # 1. Инсталляция Git, если его нет
+            # 1. Исправление проблем с APT (удаляем битый репозиторий nginx, если он мешает)
+            sudo rm -f /etc/apt/sources.list.d/nginx.list || true
+            sudo apt-get update -y || true
+            
+            # 2. Инсталляция Git, если его нет
             if ! command -v git &> /dev/null; then
-              sudo apt update && sudo apt install -y git
+              echo "📦 Установка Git..."
+              sudo apt-get install -y git
             fi
             
-            # 2. Клонирование репозитория, если папки нет
+            # 3. Клонирование репозитория, если папки нет
             if [ ! -d "telegram-shop" ]; then
+              echo "🔄 Клонирование репозитория..."
               git clone https://github.com/GiornoGiovanaJoJo/telegram-shop.git
             fi
             
             cd telegram-shop
             git pull origin main
             
-            # 3. Установка Node.js и PM2 через наш скрипт, если они отсутствуют
+            # 4. Установка Node.js и PM2 через наш скрипт, если они отсутствуют
             if ! command -v node &> /dev/null || ! command -v pm2 &> /dev/null; then
+              echo "⚙️  Запуск первичной настройки сервера..."
               chmod +x vps-deploy/setup.sh
               ./vps-deploy/setup.sh
             fi
             
-            # 4. Финальный запуск
+            # 5. Финальный запуск
+            echo "▶️  Запуск приложения..."
             npm install --production
             pm2 restart telegram-shop || pm2 start pm2.config.js
             pm2 save
