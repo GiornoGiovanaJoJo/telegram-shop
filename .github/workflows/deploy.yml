@@ -19,7 +19,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           port: 49229
           username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          password: ${{ secrets.VPS_PASSWORD }}
           script: |
             cd telegram-shop
             git pull origin main
