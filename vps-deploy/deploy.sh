@@ -1,43 +1,48 @@
 #!/bin/bash
 
-# Скрипт развертывания Telegram Shop на VPS
+# Скрипт развертывания Telegram Shop на VPS (используется GitHub Actions)
 
 set -e
 
-echo "🚀 Развертывание Telegram Shop..."
+echo "🚀 Обновление Telegram Shop..."
 
-# Проверка наличия .env файла
-if [ ! -f .env ]; then
-    echo "❌ Ошибка: файл .env не найден!"
-    echo "Скопируйте env.example в .env и заполните все переменные"
-    exit 1
+# Переход в директорию проекта (если скрипт запущен не из корня)
+cd "$(dirname "$0")/.."
+
+# Обновление кода уже выполнено через git pull в GitHub Actions,
+# но на случай ручного запуска:
+if [ -d ".git" ]; then
+    echo "🔄 Синхронизация кода..."
+    git pull origin main
 fi
-
-# Остановка приложения (если запущено)
-echo "⏸️  Остановка приложения..."
-pm2 stop telegram-shop 2>/dev/null || true
 
 # Обновление зависимостей
 echo "📦 Обновление зависимостей..."
 npm install --production
 
-# Запуск приложения
-echo "▶️  Запуск приложения..."
-pm2 start pm2.config.js
+# Создание необходимых папок
+mkdir -p logs
+mkdir -p фото
+
+# Проверка наличия .env
+if [ ! -f .env ]; then
+    echo "⚠️  Внимание: файл .env не найден!"
+    if [ -f vps-deploy/env.example ]; then
+        echo "Создаю .env на основе env.example (не забудьте отредактировать его!)"
+        cp vps-deploy/env.example .env
+    fi
+fi
+
+# Перезапуск приложения через PM2
+echo "▶️  Перезапуск приложения..."
+if pm2 show telegram-shop > /dev/null 2>&1; then
+    pm2 restart telegram-shop
+else
+    pm2 start pm2.config.js
+fi
 
 # Сохранение конфигурации PM2
-echo "💾 Сохранение конфигурации PM2..."
 pm2 save
 
-# Проверка статуса
-echo "📊 Статус приложения:"
-pm2 status
-
-echo ""
-echo "✅ Развертывание завершено!"
-echo ""
-echo "📝 Полезные команды:"
-echo "  pm2 logs telegram-shop    - просмотр логов"
-echo "  pm2 restart telegram-shop - перезапуск"
-echo "  pm2 stop telegram-shop     - остановка"
-echo "  pm2 monit                 - мониторинг"
+echo "✅ Обновление успешно завершено!"
+pm2 status telegram-shop
