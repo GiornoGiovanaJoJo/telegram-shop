@@ -326,8 +326,8 @@ body {
 .product-image {
     width: 100%;
     aspect-ratio: 3 / 4;
-    object-fit: cover;
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    object-fit: contain;
+    background: var(--primary-dark);
     display: block;
     position: relative;
     z-index: 1;
