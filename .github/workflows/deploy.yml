@@ -21,8 +21,26 @@ jobs:
           username: ${{ secrets.VPS_USERNAME }}
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
+            # 1. Инсталляция Git, если его нет
+            if ! command -v git &> /dev/null; then
+              sudo apt update && sudo apt install -y git
+            fi
+            
+            # 2. Клонирование репозитория, если папки нет
+            if [ ! -d "telegram-shop" ]; then
+              git clone https://github.com/GiornoGiovanaJoJo/telegram-shop.git
+            fi
+            
             cd telegram-shop
             git pull origin main
+            
+            # 3. Установка Node.js и PM2 через наш скрипт, если они отсутствуют
+            if ! command -v node &> /dev/null || ! command -v pm2 &> /dev/null; then
+              chmod +x vps-deploy/setup.sh
+              ./vps-deploy/setup.sh
+            fi
+            
+            # 4. Финальный запуск
             npm install --production
             pm2 restart telegram-shop || pm2 start pm2.config.js
             pm2 save
