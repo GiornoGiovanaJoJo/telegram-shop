@@ -16,6 +16,6 @@ module.exports = {
     
     // Базовый URL вашего приложения (для вебхуков и редиректов)
     // Для локальной разработки: http://localhost:3000
-    // Для продакшена: https://telegram-shop-production.up.railway.app
-    BASE_URL: process.env.BASE_URL || 'https://telegram-shop-production.up.railway.app'
+    // Для продакшена: https://494921a265f3.vps.myjino.ru
+    BASE_URL: process.env.BASE_URL || 'https://494921a265f3.vps.myjino.ru'
 };
