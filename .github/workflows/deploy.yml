@@ -20,55 +20,115 @@ jobs:
           port: 49229
           username: ${{ secrets.VPS_USERNAME }}
           password: ${{ secrets.VPS_PASSWORD }}
+          command_timeout: 15m
           script: |
-            # 1. Исправление проблем с APT (удаляем битый репозиторий nginx, если он мешает)
+            set -e
+            export DEBIAN_FRONTEND=noninteractive
+
+            echo "========================================="
+            echo "🚀 Начало деплоя Telegram Shop"
+            echo "========================================="
+
+            # 1. Починка APT
             sudo rm -f /etc/apt/sources.list.d/nginx.list || true
-            sudo apt-get update -y || true
-            
-            # 2. Инсталляция Git, если его нет
+            sudo apt-get update -y 2>/dev/null || true
+
+            # 2. Git
             if ! command -v git &> /dev/null; then
               echo "📦 Установка Git..."
               sudo apt-get install -y git
             fi
-            
-            # 3. Клонирование репозитория, если папки нет
+            echo "✅ Git: $(git --version)"
+
+            # 3. Клонирование
+            cd /root
             if [ ! -d "telegram-shop" ]; then
               echo "🔄 Клонирование репозитория..."
               git clone https://github.com/GiornoGiovanaJoJo/telegram-shop.git
             fi
-            
-            cd telegram-shop
+            cd /root/telegram-shop
             git pull origin main
-            
-            # 4. Установка Node.js и PM2 через наш скрипт, если они отсутствуют
-            if ! command -v node &> /dev/null || ! command -v pm2 &> /dev/null; then
-              echo "⚙️  Запуск первичной настройки сервера..."
-              chmod +x vps-deploy/setup.sh
-              ./vps-deploy/setup.sh
+
+            # 4. Node.js + PM2
+            if ! command -v node &> /dev/null; then
+              echo "📦 Установка Node.js..."
+              curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+              sudo apt-get install -y nodejs
             fi
-            
-            # 5. Настройка Nginx (автоматическая привязка конфига)
-            echo "⚙️  Обновление конфигурации Nginx..."
-            sudo cp vps-deploy/nginx.conf /etc/nginx/sites-available/telegram-shop
-            sudo ln -sf /etc/nginx/sites-available/telegram-shop /etc/nginx/sites-enabled/
-            
-            # Удаляем все дефолтные конфиги, которые могут перехватывать трафик
-            sudo rm -f /etc/nginx/sites-enabled/default
-            sudo rm -f /etc/nginx/conf.d/default.conf
-            
-            echo "🧪 Проверка конфигурации Nginx..."
+            echo "✅ Node: $(node -v)"
+            echo "✅ NPM: $(npm -v)"
+
+            if ! command -v pm2 &> /dev/null; then
+              echo "📦 Установка PM2..."
+              sudo npm install -g pm2
+            fi
+            echo "✅ PM2: $(pm2 -v)"
+
+            # 5. Установка зависимостей
+            echo "📦 Установка зависимостей проекта..."
+            npm install --production --omit=dev
+            mkdir -p logs
+            mkdir -p фото
+
+            # 6. Полная настройка Nginx
+            echo "⚙️  Настройка Nginx..."
+
+            # Выясняем какой Nginx установлен
+            echo "📂 Тип установки Nginx:"
+            nginx -v 2>&1 || true
+            echo "📂 Главный конфиг Nginx:"
+            cat /etc/nginx/nginx.conf | grep -E "include|conf.d|sites-enabled" || true
+
+            # Удаляем ВСЕ дефолтные конфигурации
+            sudo rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+            sudo rm -f /etc/nginx/conf.d/default.conf 2>/dev/null || true
+
+            # Определяем куда класть наш конфиг
+            if [ -d "/etc/nginx/sites-available" ]; then
+              echo "📂 Используем sites-available/sites-enabled подход"
+              sudo cp vps-deploy/nginx.conf /etc/nginx/sites-available/telegram-shop
+              sudo ln -sf /etc/nginx/sites-available/telegram-shop /etc/nginx/sites-enabled/telegram-shop
+            fi
+
+            # ТАКЖЕ кладём в conf.d (на случай если nginx.org пакет)
+            if [ -d "/etc/nginx/conf.d" ]; then
+              echo "📂 Также копируем в conf.d"
+              sudo cp vps-deploy/nginx.conf /etc/nginx/conf.d/telegram-shop.conf
+            fi
+
+            echo "📂 Активные конфиги:"
+            ls -la /etc/nginx/sites-enabled/ 2>/dev/null || echo "  Нет sites-enabled"
+            ls -la /etc/nginx/conf.d/ 2>/dev/null || echo "  Нет conf.d"
+
+            echo "🧪 Тест конфигурации Nginx..."
             sudo nginx -t
+
+            echo "🔄 Перезапуск Nginx..."
             sudo systemctl restart nginx
-            
-            # Показать, какие сайты включены
-            echo "📂 Активные конфигурации в sites-enabled:"
-            ls -l /etc/nginx/sites-enabled/
-            
-            # 6. Финальный запуск
+            echo "✅ Статус Nginx: $(sudo systemctl is-active nginx)"
+
+            # 7. Запуск приложения
             echo "▶️  Запуск приложения..."
-            npm install --production
-            pm2 restart telegram-shop || pm2 start pm2.config.js
+            cd /root/telegram-shop
+            pm2 delete telegram-shop 2>/dev/null || true
+            pm2 start pm2.config.js
             pm2 save
-            
-            echo "✅ Статус приложения в PM2:"
-            pm2 status telegram-shop
+
+            # 8. Проверка
+            sleep 3
+            echo ""
+            echo "========================================="
+            echo "📊 ДИАГНОСТИКА"
+            echo "========================================="
+            echo "PM2 статус:"
+            pm2 status
+            echo ""
+            echo "Проверка localhost:3000..."
+            curl -s -o /dev/null -w "HTTP код: %{http_code}\n" http://localhost:3000/ || echo "❌ Приложение не отвечает на localhost:3000"
+            echo ""
+            echo "PM2 логи (последние 15 строк):"
+            pm2 logs telegram-shop --lines 15 --nostream 2>&1 || true
+            echo ""
+            echo "========================================="
+            echo "✅ Деплой завершён!"
+            echo "========================================="
