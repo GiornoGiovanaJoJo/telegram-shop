@@ -1,6 +1,20 @@
 // Простой сервер для обработки заказов из Telegram Mini App
 const express = require('express');
 const axios = require('axios');
+(function setupSocksProxy() {
+  try {
+    const { SocksProxyAgent } = require('socks-proxy-agent');
+    const socksUrl = process.env.TELEGRAM_SOCKS_PROXY || process.env.ALL_PROXY;
+    if (socksUrl) {
+      const agent = new SocksProxyAgent(socksUrl);
+      axios.defaults.httpsAgent = agent;
+      axios.defaults.httpAgent = agent;
+      console.log('[proxy] SOCKS-прокси для исходящих запросов (Telegram API и др.)');
+    }
+  } catch (e) {
+    console.warn('[proxy] Не удалось настроить SOCKS:', e.message);
+  }
+})();
 const path = require('path');
 const multer = require('multer');
 const db = require('./database');

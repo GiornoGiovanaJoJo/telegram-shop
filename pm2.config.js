@@ -1,3 +1,5 @@
+// Опционально задайте TELEGRAM_SOCKS_PROXY в окружении (не храните секреты в git):
+// socks5://user:pass@host:port — см. инициализацию в server.js
 module.exports = {
   apps: [{
     name: 'telegram-shop',
