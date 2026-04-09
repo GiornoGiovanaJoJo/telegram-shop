@@ -1,21 +1,13 @@
-// Пример конфигурационного файла
-// Скопируйте этот файл в config.js и укажите ваши данные
-
-module.exports = {
-    // Telegram Bot настройки
-    BOT_TOKEN: 'ВАШ_ТОКЕН_БОТА',
-    // ID чата для получения заказов (можно получить через @userinfobot)
-    ADMIN_CHAT_ID: null, // Укажите ваш Telegram ID
-    
-    // Т-Банк (Tinkoff) платежная система
-    // Получите эти данные в личном кабинете Т-Банк: https://www.tinkoff.ru/business/acquiring/
-    TINKOFF_TERMINAL_KEY: 'ВАШ_TERMINAL_KEY',
-    TINKOFF_PASSWORD: 'ВАШ_PASSWORD',
-    // URL API (обычно не нужно менять)
-    TINKOFF_API_URL: 'https://securepay.tinkoff.ru/v2/',
-    
-    // Базовый URL вашего приложения (для вебхуков и редиректов)
-    // Для локальной разработки: http://localhost:3000
-    // Для продакшена: https://494921a265f3.vps.myjino.ru
-    BASE_URL: process.env.BASE_URL || 'https://494921a265f3.vps.myjino.ru'
-};
+/**
+ * Раньше здесь хранились секреты — теперь их нужно задавать только через переменные окружения.
+ * Скопируйте список ниже в .env на своей машине или в настройки PM2/systemd (не коммитьте .env).
+ *
+ * BOT_TOKEN              — токен бота Telegram
+ * ADMIN_CHAT_ID          — ваш Telegram ID для уведомлений о заказах
+ * TINKOFF_TERMINAL_KEY   — терминал Т‑Банка
+ * TINKOFF_PASSWORD       — пароль терминала Т‑Банка
+ * SOCKS_USER / SOCKS_PASS — логин и пароль SOCKS5 (см. constants.js: SOCKS_HOST/PORT)
+ *
+ * Опционально: BASE_URL (по умолчанию см. constants.PUBLIC_BASE_URL), TINKOFF_API_URL
+ */
+module.exports = {};

@@ -1,16 +1,23 @@
 // Простой сервер для обработки заказов из Telegram Mini App
+require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
+const constants = require('./constants');
 (function setupSocksProxy() {
   try {
-    const { SocksProxyAgent } = require('socks-proxy-agent');
-    const socksUrl = process.env.TELEGRAM_SOCKS_PROXY || process.env.ALL_PROXY;
-    if (socksUrl) {
-      const agent = new SocksProxyAgent(socksUrl);
-      axios.defaults.httpsAgent = agent;
-      axios.defaults.httpAgent = agent;
-      console.log('[proxy] SOCKS-прокси для исходящих запросов (Telegram API и др.)');
+    const user = process.env.SOCKS_USER;
+    const pass = process.env.SOCKS_PASS;
+    if (!user || !pass) {
+      return;
     }
+    const { SocksProxyAgent } = require('socks-proxy-agent');
+    const host = constants.SOCKS_HOST;
+    const port = constants.SOCKS_PORT;
+    const socksUrl = `socks5://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}:${port}`;
+    const agent = new SocksProxyAgent(socksUrl);
+    axios.defaults.httpsAgent = agent;
+    axios.defaults.httpAgent = agent;
+    console.log('[proxy] SOCKS5', host + ':' + port, 'для исходящих запросов (Telegram API и др.)');
   } catch (e) {
     console.warn('[proxy] Не удалось настроить SOCKS:', e.message);
   }
@@ -20,20 +27,15 @@ const multer = require('multer');
 const db = require('./database');
 const tinkoffPayment = require('./tinkoff-payment');
 
-// Поддержка переменных окружения для хостинга
-let config;
-try {
-    config = require('./config');
-} catch (e) {
-    config = {};
-}
-
-// Использование переменных окружения или config.js
-const BOT_TOKEN = process.env.BOT_TOKEN || config.BOT_TOKEN;
-const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || config.ADMIN_CHAT_ID;
+// Секреты только из окружения (не из config.js)
+const BOT_TOKEN = process.env.BOT_TOKEN || '';
+const ADMIN_CHAT_ID =
+  process.env.ADMIN_CHAT_ID !== undefined && process.env.ADMIN_CHAT_ID !== ''
+    ? Number(process.env.ADMIN_CHAT_ID)
+    : null;
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || constants.LISTEN_PORT;
 const fs = require('fs').promises;
 
 // Инициализация БД при запуске
@@ -86,7 +88,7 @@ app.use('/фото', express.static(uploadsDir));
 // Функция для отправки сообщения в Telegram
 async function sendTelegramMessage(chatId, text, parseMode = 'HTML') {
     if (!BOT_TOKEN) {
-        console.error('BOT_TOKEN не настроен! Укажите в переменных окружения или config.js');
+        console.error('BOT_TOKEN не настроен! Укажите переменную окружения BOT_TOKEN');
         return;
     }
     
@@ -418,7 +420,7 @@ app.post('/api/payment/create', async (req, res) => {
         if (!tinkoffPayment.isConfigured()) {
             return res.status(400).json({
                 success: false,
-                error: 'Платежная система Т-Банк не настроена. Проверьте TINKOFF_TERMINAL_KEY и TINKOFF_PASSWORD в config.js'
+                error: 'Платежная система Т-Банк не настроена. Задайте TINKOFF_TERMINAL_KEY и TINKOFF_PASSWORD в окружении'
             });
         }
 
@@ -859,13 +861,13 @@ app.listen(PORT, '0.0.0.0', () => {
     
     if (!BOT_TOKEN || BOT_TOKEN === 'ВАШ_ТОКЕН_БОТА') {
         console.warn('⚠️  ВНИМАНИЕ: Токен бота не настроен!');
-        console.warn('   Укажите токен в файле config.js или переменной окружения BOT_TOKEN');
+        console.warn('   Укажите переменную окружения BOT_TOKEN');
     }
     
     if (!ADMIN_CHAT_ID) {
         console.warn('⚠️  ВНИМАНИЕ: ADMIN_CHAT_ID не указан!');
         console.warn('   Заказы не будут отправляться администратору');
-        console.warn('   Узнайте свой ID через @userinfobot и укажите в config.js или ADMIN_CHAT_ID');
+        console.warn('   Узнайте свой ID через @userinfobot и укажите переменную окружения ADMIN_CHAT_ID');
     }
     
     // Дополнительная проверка для Railway

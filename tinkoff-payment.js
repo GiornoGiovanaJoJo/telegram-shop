@@ -1,19 +1,12 @@
 // Модуль для работы с платежной системой Т-Банк (Tinkoff)
 // Использует официальную библиотеку tbank-payments
 const TbankPayments = require('tbank-payments');
+const constants = require('./constants');
 
-// Поддержка переменных окружения для хостинга
-let config;
-try {
-    config = require('./config');
-} catch (e) {
-    config = {};
-}
-
-// Конфигурация Т-Банк
-const TINKOFF_TERMINAL_KEY = process.env.TINKOFF_TERMINAL_KEY || config.TINKOFF_TERMINAL_KEY;
-const TINKOFF_PASSWORD = process.env.TINKOFF_PASSWORD || config.TINKOFF_PASSWORD;
-const TINKOFF_API_URL = process.env.TINKOFF_API_URL || config.TINKOFF_API_URL || 'https://securepay.tinkoff.ru/v2/';
+// Секреты Т‑Банка только из окружения
+const TINKOFF_TERMINAL_KEY = process.env.TINKOFF_TERMINAL_KEY || '';
+const TINKOFF_PASSWORD = process.env.TINKOFF_PASSWORD || '';
+const TINKOFF_API_URL = process.env.TINKOFF_API_URL || constants.TINKOFF_API_URL;
 
 // Логирование для отладки
 const DEBUG_MODE = process.env.NODE_ENV === 'development' || process.env.DEBUG === 'true';
@@ -27,7 +20,7 @@ function getTbankClient() {
             console.error('ОШИБКА: TINKOFF_TERMINAL_KEY или TINKOFF_PASSWORD не установлены');
             console.error('TerminalKey:', TINKOFF_TERMINAL_KEY ? 'установлен' : 'НЕ установлен');
             console.error('Password:', TINKOFF_PASSWORD ? 'установлен' : 'НЕ установлен');
-            throw new Error('Т-Банк не настроен. Проверьте TINKOFF_TERMINAL_KEY и TINKOFF_PASSWORD в config.js или переменных окружения');
+            throw new Error('Т-Банк не настроен. Задайте TINKOFF_TERMINAL_KEY и TINKOFF_PASSWORD в окружении');
         }
         
         if (TINKOFF_TERMINAL_KEY.trim() === '' || TINKOFF_PASSWORD.trim() === '') {
@@ -77,7 +70,7 @@ async function createPayment(paymentData) {
             Description: description || `Заказ #${orderId}`,
             SuccessURL: successUrl,
             FailURL: failureUrl,
-            NotificationURL: `${(process.env.BASE_URL || config.BASE_URL || 'https://telegram-shop-production.up.railway.app').replace(/\/$/, '')}/api/payment/webhook`,
+            NotificationURL: `${(process.env.BASE_URL || constants.PUBLIC_BASE_URL).replace(/\/$/, '')}/api/payment/webhook`,
             CustomerKey: customer?.id?.toString() || orderId.toString()
         };
         
