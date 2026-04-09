@@ -1,18 +1,35 @@
-// Инициализация Telegram Web App
-const tg = window.Telegram.WebApp;
-tg.ready();
-tg.expand();
+// Telegram Web App (опционально: вне Telegram страница работает без SDK)
+const tg = window.Telegram?.WebApp;
 
-// Настройка кнопки главного меню (если используется)
-if (tg.MainButton) {
-    tg.MainButton.setText('Оформить заказ');
-    tg.MainButton.onClick(() => {
-        const checkoutBtn = document.getElementById('checkout-btn');
-        if (checkoutBtn && !checkoutBtn.disabled) {
-            handleCheckout();
-        }
-    });
+function tgAlert(message, callback) {
+    if (tg?.showAlert) {
+        tg.showAlert(message, callback);
+    } else {
+        alert(message);
+        if (typeof callback === 'function') callback();
+    }
 }
+
+function initTelegramUI() {
+    if (!tg) return;
+    try {
+        tg.ready();
+        tg.expand();
+    } catch (e) {
+        console.warn('Telegram WebApp:', e);
+    }
+    if (tg.MainButton) {
+        tg.MainButton.setText('Оформить заказ');
+        tg.MainButton.onClick(() => {
+            const checkoutBtn = document.getElementById('checkout-btn');
+            if (checkoutBtn && !checkoutBtn.disabled) {
+                handleCheckout();
+            }
+        });
+    }
+}
+
+initTelegramUI();
 
 // Данные товаров (загружаются с сервера)
 let products = [];
@@ -159,7 +176,7 @@ function renderProducts() {
         
         return `
         <div class="product-card" onclick="showProduct(${product.id})">
-            <img src="${firstImage}" alt="${product.name}" class="product-image" onerror="this.style.display='none'; this.parentElement.querySelector('.product-image-fallback').style.display='flex';">
+            <img src="${firstImage}" alt="${product.name}" class="product-image" loading="lazy" decoding="async" onerror="this.style.display='none'; this.parentElement.querySelector('.product-image-fallback').style.display='flex';">
             <div class="product-image-fallback" style="display: ${firstImage ? 'none' : 'flex'}; width: 100%; height: 180px; align-items: center; justify-content: center; font-size: 48px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);">${product.emoji}</div>
             <div class="product-info">
                 <div class="product-name">${product.name}</div>
@@ -275,7 +292,7 @@ function addToCart(productId) {
     }
 
     // Показать уведомление
-    tg.showAlert('Товар добавлен в корзину!');
+    tgAlert('Товар добавлен в корзину!');
 }
 
 // Удалить из корзины
@@ -348,8 +365,8 @@ function showPaymentForm() {
     if (state.cart.length === 0) return;
     
     // Получаем информацию о пользователе из Telegram
-    const userInfo = tg.initDataUnsafe?.user || null;
-    
+    const userInfo = tg?.initDataUnsafe?.user || null;
+
     // Заполняем форму данными из Telegram, если они есть
     if (userInfo?.first_name || userInfo?.last_name) {
         const fullName = `${userInfo.first_name || ''} ${userInfo.last_name || ''}`.trim();
@@ -393,45 +410,45 @@ async function handlePaymentFormSubmit() {
     
     // Валидация обязательных полей
     if (!fio) {
-        tg.showAlert('⚠️ Пожалуйста, укажите ФИО');
+        tgAlert('⚠️ Пожалуйста, укажите ФИО');
         elements.paymentFio.focus();
         return;
     }
     
     if (!phone) {
-        tg.showAlert('⚠️ Пожалуйста, укажите номер телефона');
+        tgAlert('⚠️ Пожалуйста, укажите номер телефона');
         elements.paymentPhone.focus();
         return;
     }
     
     // Проверяем, что указан хотя бы email или phone для чека
     if (!email && !phone) {
-        tg.showAlert('⚠️ Пожалуйста, укажите Email или Телефон для получения чека');
+        tgAlert('⚠️ Пожалуйста, укажите Email или Телефон для получения чека');
         return;
     }
     
     if (!city) {
-        tg.showAlert('⚠️ Пожалуйста, укажите город');
+        tgAlert('⚠️ Пожалуйста, укажите город');
         elements.paymentCity.focus();
         return;
     }
     
     if (!address) {
-        tg.showAlert('⚠️ Пожалуйста, укажите адрес доставки');
+        tgAlert('⚠️ Пожалуйста, укажите адрес доставки');
         elements.paymentAddress.focus();
         return;
     }
     
     // Валидация email, если указан
     if (email && !isValidEmail(email)) {
-        tg.showAlert('⚠️ Пожалуйста, укажите корректный Email адрес');
+        tgAlert('⚠️ Пожалуйста, укажите корректный Email адрес');
         elements.paymentEmail.focus();
         return;
     }
     
     // Валидация телефона
     if (!isValidPhone(phone)) {
-        tg.showAlert('⚠️ Пожалуйста, укажите корректный номер телефона');
+        tgAlert('⚠️ Пожалуйста, укажите корректный номер телефона');
         elements.paymentPhone.focus();
         return;
     }
@@ -477,11 +494,12 @@ async function handleCheckout(deliveryData = {}) {
     const message = `Ваш заказ:\n\n${orderDetails}\n\nИтого: ${formatPrice(total)}`;
 
     // Получаем информацию о пользователе из Telegram
-    const userInfo = tg.initDataUnsafe?.user || null;
+    const userInfo = tg?.initDataUnsafe?.user || null;
 
-    // Показываем индикатор загрузки
-    tg.MainButton.showProgress();
-    tg.MainButton.setText('Оформление...');
+    if (tg?.MainButton) {
+        tg.MainButton.showProgress();
+        tg.MainButton.setText('Оформление...');
+    }
 
     try {
         // Определяем URL API (для продакшена используйте ваш домен)
@@ -558,7 +576,7 @@ async function handleCheckout(deliveryData = {}) {
                     
                     // Перенаправляем на страницу оплаты
                     // Используем tg.openLink для Telegram Mini App, иначе window.location
-                    if (window.Telegram && window.Telegram.WebApp && tg.openLink) {
+                    if (tg?.openLink) {
                         // В Telegram Mini App используем специальный метод
                         console.log('Используем tg.openLink для перенаправления');
                         tg.openLink(paymentResult.paymentUrl);
@@ -575,15 +593,16 @@ async function handleCheckout(deliveryData = {}) {
             } catch (paymentError) {
                 console.error('Ошибка создания платежа:', paymentError);
                 
-                // Резервный вариант - отправка через Telegram
-                tg.sendData(JSON.stringify({
-                    type: 'order',
-                    items: state.cart,
-                    total: total,
-                    orderId: orderId
-                }));
+                if (typeof tg?.sendData === 'function') {
+                    tg.sendData(JSON.stringify({
+                        type: 'order',
+                        items: state.cart,
+                        total: total,
+                        orderId: orderId
+                    }));
+                }
 
-                tg.showAlert(`✅ Заказ #${orderId} создан!\n\n⚠️ Ошибка создания платежа. Мы свяжемся с вами для оплаты.`, () => {
+                tgAlert(`✅ Заказ #${orderId} создан!\n\n⚠️ Ошибка создания платежа. Мы свяжемся с вами для оплаты.`, () => {
                     state.cart = [];
                     saveCart();
                     updateCartBadge();
@@ -597,14 +616,15 @@ async function handleCheckout(deliveryData = {}) {
     } catch (error) {
         console.error('Ошибка оформления заказа:', error);
         
-        // Резервный вариант - отправка через Telegram Web App API
-        tg.sendData(JSON.stringify({
-            type: 'order',
-            items: state.cart,
-            total: total
-        }));
+        if (typeof tg?.sendData === 'function') {
+            tg.sendData(JSON.stringify({
+                type: 'order',
+                items: state.cart,
+                total: total
+            }));
+        }
 
-        tg.showAlert(`⚠️ ${message}\n\nЗаказ отправлен через Telegram. Мы обработаем его вручную.`, () => {
+        tgAlert(`⚠️ ${message}\n\nЗаказ отправлен через Telegram. Мы обработаем его вручную.`, () => {
             state.cart = [];
             saveCart();
             updateCartBadge();
@@ -612,8 +632,10 @@ async function handleCheckout(deliveryData = {}) {
             showPage('main');
         });
     } finally {
-        tg.MainButton.hideProgress();
-        tg.MainButton.setText('Оформить заказ');
+        if (tg?.MainButton) {
+            tg.MainButton.hideProgress();
+            tg.MainButton.setText('Оформить заказ');
+        }
     }
 }
 

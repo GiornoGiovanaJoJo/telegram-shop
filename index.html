@@ -28,8 +28,9 @@
     <!-- Дополнительные теги (добавьте свои здесь) -->
     <!-- <meta name="robots" content="noindex, nofollow"> -->
     <!-- <meta http-equiv="X-UA-Compatible" content="IE=edge"> -->
-    
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <link rel="dns-prefetch" href="https://telegram.org">
+    <link rel="preconnect" href="https://telegram.org" crossorigin>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -37,7 +38,7 @@
     <div id="main-page" class="page active">
         <header class="header">
             <div class="logo-container">
-                <img src="Лого Аникин/4.png" alt="Логотип" class="logo" onerror="this.src='Лого Аникин/4.png';">
+                <img src="Лого Аникин/4.png" alt="Логотип" class="logo" fetchpriority="high" decoding="async" onerror="this.src='Лого Аникин/4.png';">
             </div>
             <h1>Магазин товаров</h1>
             <div class="cart-icon" id="cart-icon">
@@ -235,6 +236,7 @@
         </div>
     </footer>
     
-    <script src="app.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
+    <script src="app.js" defer></script>
 </body>
 </html>
