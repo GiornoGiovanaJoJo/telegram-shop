@@ -47,7 +47,10 @@ jobs:
               git clone https://github.com/GiornoGiovanaJoJo/telegram-shop.git
             fi
             cd /root/telegram-shop
-            git pull origin main
+            echo "🔄 Синхронизация с origin/main (локальные правки в отслеживаемых файлах сбрасываются)..."
+            git fetch origin
+            git checkout main
+            git reset --hard origin/main
 
             # 4. Node.js + PM2
             if ! command -v node &> /dev/null; then
